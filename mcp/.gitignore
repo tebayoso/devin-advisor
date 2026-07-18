@@ -2,5 +2,8 @@ node_modules/
 dist/
 .test-build/
 .wrangler/
+.wrangler-state/
 .dev.vars
 *.log
+TEST_PLAN.md
+test-report.md
