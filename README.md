@@ -36,6 +36,10 @@ Full design: [`docs/architecture.md`](docs/architecture.md).
 | `save_memory` / `query_memory` | Cross-session key/value memory scoped by workspace |
 | `get_verification_checklist` | Self-verification checklist to satisfy before proposing a PR |
 
+> **Scaffold status:** `decompose_task` and `run_adversarial_review` currently return deterministic,
+> structured skeletons so the end-to-end pipeline and D1 persistence work reliably. Model-backed
+> generation is tracked under `phase:improvements`. See [`docs/architecture.md`](docs/architecture.md).
+
 ## Quick start (4 steps)
 
 1. **Deploy the MCP** (once):
@@ -52,6 +56,11 @@ Full design: [`docs/architecture.md`](docs/architecture.md).
    discovered).
 4. **Use it**: `Scope this task: <your ambiguous task>`.
 
+Verify the deployment at any time:
+```bash
+curl https://devin-scope.<your-subdomain>.workers.dev/health      # -> ok
+```
+
 See [`examples/demo-script.md`](examples/demo-script.md) and
 [`examples/ambiguous-tasks.md`](examples/ambiguous-tasks.md).
 
@@ -63,6 +72,35 @@ npm install
 npm run typecheck
 npm run dev        # local Worker on http://localhost:8787 (POST /mcp)
 ```
+
+Only `POST /mcp` (JSON-RPC 2.0) and `GET /health` are served. Quick smoke test:
+```bash
+curl -s http://localhost:8787/mcp -H 'content-type: application/json' \
+  -d '{"jsonrpc":"2.0","id":1,"method":"tools/list"}'
+```
+
+## Documentation
+
+- [`docs/PRD.md`](docs/PRD.md) — full product spec.
+- [`docs/architecture.md`](docs/architecture.md) — design and key decisions.
+- [`docs/troubleshooting.md`](docs/troubleshooting.md) — troubleshooting & FAQ.
+- [`docs/marketplace.md`](docs/marketplace.md) — Devin MCP Marketplace submission prep.
+- [`examples/`](examples) — demo script and example ambiguous tasks.
+
+## Troubleshooting & FAQ
+
+Common fixes (full list in [`docs/troubleshooting.md`](docs/troubleshooting.md)):
+
+- **Tools not listed in Devin?** Ensure the URL ends in `/mcp` and the transport is HTTP / Streamable
+  HTTP; check `GET /health` returns `ok`.
+- **`no such table` errors?** Apply the schema with `npm run db:init`.
+- **`wrangler deploy` D1 error?** Create the database and paste its `database_id` into `wrangler.toml`.
+- **Memory empty in a second session?** Use a consistent `workspace` id (or omit it in both places).
+
+## Devin MCP Marketplace
+
+An official Marketplace listing is a post-MVP goal. Submission metadata, prerequisites, and a
+readiness checklist are prepared in [`docs/marketplace.md`](docs/marketplace.md).
 
 ## Roadmap
 
