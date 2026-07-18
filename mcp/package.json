@@ -1,0 +1,22 @@
+{
+  "name": "devin-scope-mcp",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Remote MCP server (Cloudflare Workers + D1) for devin-scope: task decomposition, adversarial review, and cross-session memory.",
+  "license": "MIT",
+  "type": "module",
+  "main": "src/index.ts",
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "lint": "tsc --noEmit",
+    "test": "node --test",
+    "dev": "wrangler dev",
+    "deploy": "wrangler deploy",
+    "db:init": "wrangler d1 execute devin_scope --file=./schema.sql"
+  },
+  "devDependencies": {
+    "@cloudflare/workers-types": "4.20240725.0",
+    "typescript": "5.5.4",
+    "wrangler": "3.65.1"
+  }
+}
