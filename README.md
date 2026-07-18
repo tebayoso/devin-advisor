@@ -61,8 +61,40 @@ See [`examples/demo-script.md`](examples/demo-script.md) and
 cd mcp
 npm install
 npm run typecheck
+npm test           # runs the node:test suite via tsx
 npm run dev        # local Worker on http://localhost:8787 (POST /mcp)
 ```
+
+## Local stdio transport (Devin Desktop / CLI) — optional
+
+The primary, Cloud-first path is the remote **Streamable HTTP** Worker above. As a
+convenience for Devin **Desktop / CLI** power users, `devin-scope` also ships an
+**optional local stdio build** (`mcp/src/stdio.ts`) that exposes the *exact same
+tools* over newline-delimited JSON-RPC 2.0 on stdin/stdout.
+
+```bash
+cd mcp
+npm install                # installs tsx (used to run the TypeScript entrypoint)
+
+# Register the local server with the Devin CLI (adjust the absolute path):
+devin mcp add devin-scope-local -- npm --prefix /ABSOLUTE/PATH/TO/devin-advisor/mcp run stdio
+# Equivalent direct form:
+# devin mcp add devin-scope-local -- npx -y tsx /ABSOLUTE/PATH/TO/devin-advisor/mcp/src/stdio.ts
+```
+
+Then use it exactly like the remote server (e.g. `Scope this task: <your task>`).
+
+**Persistence — D1 is remote.** Cloudflare D1 backs the HTTP Worker and is *not*
+reachable from a local process, so the stdio build falls back to a **local
+file-backed store** (`mcp/src/local-store.ts`).
+
+- Default location: `~/.devin-scope/local-store.json`.
+- Override with `DEVIN_SCOPE_LOCAL_DB=/path/to/store.json`.
+- Use `DEVIN_SCOPE_LOCAL_DB=:memory:` for an ephemeral, non-persisted store.
+
+Limitation: unlike remote D1, this local store is **per-machine and not shared**
+across sessions or other users. For shared cross-session memory, use the remote
+Streamable HTTP deployment.
 
 ## Roadmap
 
