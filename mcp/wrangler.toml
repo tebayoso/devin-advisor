@@ -9,6 +9,15 @@ routes = [
   { pattern = "devin.sinequix.com", custom_domain = true }
 ]
 
+# Optional shared Bearer-token auth. Leave unset for a public demo deployment.
+# When set, requests to POST /mcp must send `Authorization: Bearer <AUTH_TOKEN>`
+# or receive a 401. Set it as an encrypted secret (recommended), not plaintext:
+#   wrangler secret put AUTH_TOKEN
+# For local dev you can put it in a git-ignored `.dev.vars` file:
+#   AUTH_TOKEN = "your-token"
+# [vars]
+# AUTH_TOKEN = ""
+
 # Cloudflare D1 binding. Create the database with:
 #   wrangler d1 create devin_scope
 # then paste the returned database_id below.

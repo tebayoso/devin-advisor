@@ -5,6 +5,9 @@ export interface Env {
   AI?: Ai;
   // Optional override for the Workers AI text-generation model id.
   DECOMPOSE_MODEL?: string;
+  // Optional shared Bearer token. When set, requests to /mcp must include
+  // `Authorization: Bearer <AUTH_TOKEN>`. When unset, the server is public.
+  AUTH_TOKEN?: string;
 }
 
 export type Confidence = "high" | "medium" | "low";

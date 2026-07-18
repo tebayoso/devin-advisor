@@ -64,6 +64,22 @@ npm run typecheck
 npm run dev        # local Worker on http://localhost:8787 (POST /mcp)
 ```
 
+## Authentication (optional)
+
+The MCP is **public by default** (per PRD §6.1/§13) so the demo works with no setup. For
+non-demo deployments you can require a shared Bearer token:
+
+1. Set the `AUTH_TOKEN` secret on the Worker:
+   ```bash
+   cd mcp
+   wrangler secret put AUTH_TOKEN     # paste your token when prompted
+   ```
+   For local dev, put it in a git-ignored `mcp/.dev.vars` file: `AUTH_TOKEN = "your-token"`.
+2. When `AUTH_TOKEN` is set, every `POST /mcp` request must include the header
+   `Authorization: Bearer <AUTH_TOKEN>`; requests that are missing it or send the wrong token
+   get `401 Unauthorized`. In Devin, add the header under the custom MCP server's configuration.
+3. When `AUTH_TOKEN` is unset, behavior is unchanged (public demo). `GET /health` is always public.
+
 ## Roadmap
 
 Work is tracked as GitHub issues in two phases:
