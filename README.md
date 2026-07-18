@@ -35,6 +35,13 @@ Full design: [`docs/architecture.md`](docs/architecture.md).
 | `save_plan` / `get_plan` | Persist and retrieve plans |
 | `save_memory` / `query_memory` | Cross-session key/value memory scoped by workspace |
 | `get_verification_checklist` | Self-verification checklist to satisfy before proposing a PR |
+| `promote_plan` | Score a plan against quality heuristics and, if it qualifies, emit a Knowledge/Playbook artifact + the Devin MCP calls to persist it |
+
+### Promoting high-quality plans
+
+Once a plan has been decomposed, adversarially reviewed, and incorporated, call `promote_plan` to
+auto-promote it into **Devin Knowledge** or a new **Playbook** for reuse. See
+[`docs/promotion.md`](docs/promotion.md) for the heuristics and the full flow.
 
 ## Quick start (4 steps)
 

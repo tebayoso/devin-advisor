@@ -65,6 +65,13 @@ prompts so the user can launch sessions manually.
 3. Call \`devin_session_gather\` to collect the resulting PRs/status; verify each against the checklist.
 4. Call \`devin_knowledge_manage\` to store any reusable insight for future sessions.
 
+## Step 8 — Promote high-quality plans (optional)
+After incorporating the review, call \`promote_plan\` with the \`plan_id\`, the adversarial \`review\`, and
+\`review_incorporated: true\`. It scores the plan against quality heuristics (well-scoped, justified,
+high-confidence, reviewed + incorporated). If it qualifies, it returns a ready-to-use Knowledge note or
+Playbook artifact plus the official Devin MCP calls (\`devin_knowledge_manage\` / \`devin_playbook_manage\`)
+to persist it for reuse. Run those calls to promote the plan.
+
 ## Output
 Deliver: (1) the final decomposition with confidence per subtask, (2) the adversarial review summary,
 (3) the execution strategy, (4) the verification checklist, and (5) copy-paste-ready prompts for each
