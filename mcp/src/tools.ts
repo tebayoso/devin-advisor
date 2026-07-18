@@ -1,9 +1,11 @@
 import { getPlan, insertPlan, queryMemory, saveMemory } from "./db.js";
 import { SCOPE_INSTRUCTIONS } from "./instructions.js";
+import { DEFAULT_PROMOTION_THRESHOLD, promotePlan } from "./promotion.js";
 import type {
   AdversarialReview,
   Decomposition,
   Env,
+  PromotionTarget,
   ToolDefinition,
 } from "./types.js";
 
@@ -99,6 +101,37 @@ export const TOOL_DEFINITIONS: ToolDefinition[] = [
     name: "get_verification_checklist",
     description: "Return a concrete self-verification checklist to satisfy before proposing a PR.",
     inputSchema: { type: "object", properties: {}, additionalProperties: false },
+  },
+  {
+    name: "promote_plan",
+    description:
+      "Assess a saved plan against 'high-quality' heuristics and, when it qualifies, generate a Knowledge note or Playbook artifact plus the official Devin MCP calls to persist it (PRD §12).",
+    inputSchema: {
+      type: "object",
+      properties: {
+        plan_id: { type: "string", description: "Id returned by save_plan." },
+        review: {
+          type: "object",
+          description:
+            "The adversarial review from run_adversarial_review, so the promoter can confirm the plan was well-reviewed.",
+        },
+        review_incorporated: {
+          type: "boolean",
+          description: "Whether the adversarial findings were incorporated into the plan.",
+        },
+        target: {
+          type: "string",
+          enum: ["knowledge", "playbook"],
+          description: "Promotion target. Defaults to 'knowledge'.",
+        },
+        threshold: {
+          type: "number",
+          description: `Quality score (0-100) required to qualify. Defaults to ${DEFAULT_PROMOTION_THRESHOLD}.`,
+        },
+      },
+      required: ["plan_id"],
+      additionalProperties: false,
+    },
   },
 ];
 
@@ -200,6 +233,29 @@ export async function callTool(
       if (!query) throw new Error("`query` is required");
       const results = await queryMemory(env, str(args, "workspace") ?? null, query);
       return { results };
+    }
+
+    case "promote_plan": {
+      const planId = str(args, "plan_id");
+      if (!planId) throw new Error("`plan_id` is required");
+      const plan = await getPlan(env, planId);
+      if (!plan) throw new Error(`Plan not found: ${planId}`);
+      const review =
+        args.review && typeof args.review === "object"
+          ? (args.review as AdversarialReview)
+          : undefined;
+      const target =
+        args.target === "knowledge" || args.target === "playbook"
+          ? (args.target as PromotionTarget)
+          : undefined;
+      const threshold = typeof args.threshold === "number" ? args.threshold : undefined;
+      return promotePlan({
+        plan,
+        review,
+        reviewIncorporated: args.review_incorporated === true,
+        target,
+        threshold,
+      });
     }
 
     case "get_verification_checklist":

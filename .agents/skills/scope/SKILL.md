@@ -30,6 +30,10 @@ protocol below strictly and in order. Do not invent your own decomposition proce
    proposing any PR.
 6. **Persist learnings** — Use `save_memory` for reusable insights; `query_memory` at the start when
    relevant history may exist.
+7. **Promote (optional)** — Call `promote_plan` with the `plan_id`, the adversarial `review`, and
+   `review_incorporated: true`. If the plan clears the quality heuristics, it returns a Knowledge note or
+   Playbook artifact plus the official Devin MCP calls (`devin_knowledge_manage` / `devin_playbook_manage`)
+   to persist it for reuse.
 
 ## Optional orchestration
 

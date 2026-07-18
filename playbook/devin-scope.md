@@ -15,3 +15,5 @@ Mandatory steps:
 3. Do not invent your own decomposition process.
 4. Always run `run_adversarial_review` before finalizing any plan.
 5. Persist the final plan using the MCP tools (`save_plan`, `save_memory`).
+6. For high-quality, well-reviewed plans, call `promote_plan` and run the returned official Devin MCP
+   calls to promote the plan into Knowledge or a Playbook for reuse.

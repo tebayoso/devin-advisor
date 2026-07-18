@@ -36,6 +36,13 @@ proposing any PR (tests to run, computer-use/visual verification where relevant,
 Use \`save_memory\` to store notable recurring patterns or adversarial insights so future sessions
 benefit. Use \`query_memory\` at the start when relevant history may exist.
 
+## Step 7 — Promote high-quality plans (optional)
+After incorporating the review, call \`promote_plan\` with the \`plan_id\`, the adversarial \`review\`, and
+\`review_incorporated: true\`. It scores the plan against quality heuristics (well-scoped, justified,
+high-confidence, reviewed + incorporated). If it qualifies, it returns a ready-to-use Knowledge note or
+Playbook artifact plus the official Devin MCP calls (\`devin_knowledge_manage\` / \`devin_playbook_manage\`)
+to persist it for reuse. Run those calls to promote the plan.
+
 ## Optional — Orchestration
 When configured, use the official Devin MCP (https://mcp.devin.ai/mcp) to create managed sessions for
 high-confidence parallel subtasks, gather their results, and update Knowledge.
