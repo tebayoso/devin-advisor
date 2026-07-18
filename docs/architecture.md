@@ -46,7 +46,23 @@ User ──▶ Devin Cloud Agent
   reads (`get_plan`, `query_memory`, `run_adversarial_review`) filter by workspace, so data is isolated
   per workspace and cross-workspace reads are prevented. Backfill: `migrations/0001_workspace_isolation.sql`.
 
+## Data model
+
+D1 tables (`schema.sql`):
+
+- `plans` — `id`, `workspace`, `original_task`, `decomposition` (JSON), `confidence_summary`,
+  `created_at`. Written by `save_plan`, read by `get_plan`.
+- `reviews` — adversarial review records associated with a plan.
+- `memory` — `id`, `workspace`, `key`, `value`, `tags`, `created_at`. Written by `save_memory`;
+  `query_memory` does a substring (`LIKE`) match over key/value/tags, scoped by `workspace`.
+
 ## Scaffold status
 
 `decompose_task` and `run_adversarial_review` currently return deterministic skeletons; model-backed
 generation, real persistence wiring, tests, and deployment are tracked in the roadmap issues.
+
+## Related docs
+
+- [`PRD.md`](PRD.md) — full product spec.
+- [`troubleshooting.md`](troubleshooting.md) — troubleshooting & FAQ.
+- [`marketplace.md`](marketplace.md) — Devin MCP Marketplace submission prep.
