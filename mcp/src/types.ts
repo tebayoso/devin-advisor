@@ -1,5 +1,25 @@
 export interface Env {
   DB: D1Database;
+  // Linear / Jira ticket integration (optional; required only for ticket tools).
+  LINEAR_API_KEY?: string;
+  JIRA_BASE_URL?: string;
+  JIRA_EMAIL?: string;
+  JIRA_API_TOKEN?: string;
+}
+
+export type TicketProvider = "linear" | "jira";
+
+export interface TicketRef {
+  provider: TicketProvider;
+  id: string;
+}
+
+export interface TicketData {
+  provider: TicketProvider;
+  id: string;
+  title: string;
+  description: string;
+  url: string;
 }
 
 export type Confidence = "high" | "medium" | "low";

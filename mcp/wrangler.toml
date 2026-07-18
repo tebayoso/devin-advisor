@@ -10,3 +10,10 @@ compatibility_flags = ["nodejs_compat"]
 binding = "DB"
 database_name = "devin_scope"
 database_id = "REPLACE_WITH_YOUR_D1_DATABASE_ID"
+
+# Linear / Jira ticket integration (optional; required only for scope_ticket /
+# post_plan_to_ticket). Set these as encrypted secrets, never commit values:
+#   wrangler secret put LINEAR_API_KEY
+#   wrangler secret put JIRA_BASE_URL   # e.g. https://your-site.atlassian.net
+#   wrangler secret put JIRA_EMAIL
+#   wrangler secret put JIRA_API_TOKEN
