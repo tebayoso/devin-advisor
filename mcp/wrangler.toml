@@ -3,10 +3,16 @@ main = "src/index.ts"
 compatibility_date = "2024-07-12"
 compatibility_flags = ["nodejs_compat"]
 
+# Serve the Worker on a custom domain. Wrangler provisions the Custom Domain
+# and DNS record automatically since the sinequix.com zone is in this account.
+routes = [
+  { pattern = "devin.sinequix.com", custom_domain = true }
+]
+
 # Cloudflare D1 binding. Create the database with:
 #   wrangler d1 create devin_scope
 # then paste the returned database_id below.
 [[d1_databases]]
 binding = "DB"
 database_name = "devin_scope"
-database_id = "REPLACE_WITH_YOUR_D1_DATABASE_ID"
+database_id = "db225267-1030-4869-9530-b7cfdc4ff586"
