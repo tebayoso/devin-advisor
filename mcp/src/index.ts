@@ -15,6 +15,27 @@ function rpcError(
   return { jsonrpc: "2.0", id: id ?? null, error: { code, message } };
 }
 
+// Constant-time string comparison to avoid leaking the token via timing.
+function timingSafeEqual(a: string, b: string): boolean {
+  if (a.length !== b.length) return false;
+  let mismatch = 0;
+  for (let i = 0; i < a.length; i++) {
+    mismatch |= a.charCodeAt(i) ^ b.charCodeAt(i);
+  }
+  return mismatch === 0;
+}
+
+// Returns true when the request is authorized. Auth is optional: when
+// AUTH_TOKEN is unset (or empty), every request is allowed (public demo).
+function isAuthorized(env: Env, request: Request): boolean {
+  const expected = env.AUTH_TOKEN;
+  if (!expected) return true;
+  const header = request.headers.get("Authorization") ?? "";
+  const match = /^Bearer (.+)$/.exec(header);
+  if (!match) return false;
+  return timingSafeEqual(match[1], expected);
+}
+
 async function handleRpc(env: Env, req: JsonRpcRequest): Promise<JsonRpcResponse> {
   switch (req.method) {
     case "initialize":
@@ -62,6 +83,13 @@ export default {
 
     if (request.method !== "POST") {
       return new Response("Method not allowed", { status: 405 });
+    }
+
+    if (!isAuthorized(env, request)) {
+      return Response.json(rpcError(null, -32001, "Unauthorized"), {
+        status: 401,
+        headers: { "WWW-Authenticate": "Bearer" },
+      });
     }
 
     let body: JsonRpcRequest;

@@ -1,5 +1,8 @@
 export interface Env {
   DB: D1Database;
+  // Optional shared Bearer token. When set, requests to /mcp must include
+  // `Authorization: Bearer <AUTH_TOKEN>`. When unset, the server is public.
+  AUTH_TOKEN?: string;
 }
 
 export type Confidence = "high" | "medium" | "low";
