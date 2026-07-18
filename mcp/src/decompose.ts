@@ -8,6 +8,7 @@
 // call fails/returns unusable output, a strong heuristic decomposition is used
 // as a deterministic fallback.
 
+import { suggestRouting } from "./routing.js";
 import type {
   Confidence,
   Decomposition,
@@ -217,6 +218,7 @@ export function coerceDecomposition(
     executionStrategy: strategy,
     estimatedComplexity: complexity,
     confidenceSummary: summary,
+    routing: suggestRouting(subtasks, complexity, strategy),
   };
 }
 
@@ -554,5 +556,6 @@ export function heuristicDecomposition(
     executionStrategy: strategy,
     estimatedComplexity: complexity,
     confidenceSummary: buildConfidenceSummary(subtasks, strategy, complexity),
+    routing: suggestRouting(subtasks, complexity, strategy),
   };
 }

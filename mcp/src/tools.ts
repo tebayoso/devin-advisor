@@ -11,6 +11,7 @@ import { devinApiConfigured, runCriticSession } from "./devin.js";
 import { SCOPE_INSTRUCTIONS } from "./instructions.js";
 import { DEFAULT_PROMOTION_THRESHOLD, promotePlan } from "./promotion.js";
 import { buildAdversarialReview, extractKeywords } from "./review.js";
+import { suggestRouting } from "./routing.js";
 import type {
   AdversarialReview,
   Decomposition,
@@ -30,7 +31,7 @@ export const TOOL_DEFINITIONS: ToolDefinition[] = [
   {
     name: "decompose_task",
     description:
-      "Decompose an ambiguous task into 3-7 subtasks with per-subtask confidence and a recommended execution strategy.",
+      "Decompose an ambiguous task into 3-7 subtasks with per-subtask confidence, a recommended execution strategy, and cost/confidence routing suggestions (model tier, local vs cloud, parallel managed Devins).",
     inputSchema: {
       type: "object",
       properties: {
@@ -240,6 +241,14 @@ export async function callTool(
       const decomposition = args.decomposition as Decomposition | undefined;
       if (!originalTask || !decomposition) {
         throw new Error("`original_task` and `decomposition` are required");
+      }
+      // Backfill routing suggestions if the caller supplied a decomposition without them.
+      if (!decomposition.routing && Array.isArray(decomposition.subtasks)) {
+        decomposition.routing = suggestRouting(
+          decomposition.subtasks,
+          decomposition.estimatedComplexity ?? "medium",
+          decomposition.executionStrategy ?? "sequential",
+        );
       }
       const plan = await insertPlan(env, {
         workspace: normalizeWorkspace(str(args, "workspace")),

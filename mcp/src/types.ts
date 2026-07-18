@@ -29,11 +29,33 @@ export interface Subtask {
   dependsOn: string[];
 }
 
+export type Complexity = "low" | "medium" | "high";
+
+export type ModelTier = "lite" | "standard" | "advanced";
+
+export type RoutingEnvironment = "local" | "cloud";
+
+export interface SubtaskRouting {
+  subtaskId: string;
+  model: ModelTier;
+  environment: RoutingEnvironment;
+  rationale: string;
+}
+
+export interface RoutingSuggestion {
+  recommendedModel: ModelTier;
+  environment: RoutingEnvironment;
+  parallelDevins: number;
+  perSubtask: SubtaskRouting[];
+  rationale: string;
+}
+
 export interface Decomposition {
   subtasks: Subtask[];
   executionStrategy: ExecutionStrategy;
-  estimatedComplexity: "low" | "medium" | "high";
+  estimatedComplexity: Complexity;
   confidenceSummary: string;
+  routing: RoutingSuggestion;
 }
 
 // Shared taxonomy for categorizing adversarial critiques (assumptions, edge

@@ -10,7 +10,9 @@ for any scoping, decomposition, or "plan this task" request. Do not invent your 
 ## Step 1 — Decompose
 Call \`decompose_task\` with the user's original task (and any repo/context). Produce 3–7 concrete
 subtasks. For each subtask assign a confidence level (high | medium | low) with a short justification,
-and recommend an execution strategy (parallel / sequential / managed Devins).
+and recommend an execution strategy (parallel / sequential / managed Devins). The response also includes
+\`routing\` suggestions (model tier, local vs cloud, and how many parallel managed Devins) derived from
+each subtask's confidence and the estimated complexity — surface these to the user.
 
 ## Step 2 — Persist the plan
 Call \`save_plan\` with the decomposition to obtain a \`plan_id\`. All later steps reference this id.
@@ -74,5 +76,5 @@ to persist it for reuse. Run those calls to promote the plan.
 
 ## Output
 Deliver: (1) the final decomposition with confidence per subtask, (2) the adversarial review summary,
-(3) the execution strategy, (4) the verification checklist, and (5) copy-paste-ready prompts for each
-subtask / managed Devin.`;
+(3) the execution strategy and routing suggestions (model tier, local vs cloud, parallel managed Devins),
+(4) the verification checklist, and (5) copy-paste-ready prompts for each subtask / managed Devin.`;
