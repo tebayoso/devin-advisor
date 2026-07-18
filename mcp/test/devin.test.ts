@@ -153,6 +153,43 @@ test("runCriticSession creates a session, polls, and returns a critic-session re
   }
 });
 
+test("runCriticSession stops the session and throws a timeout after polling", async () => {
+  const original = globalThis.fetch;
+  let stopCalls = 0;
+  let polls = 0;
+  // Deadline = 0 + 10 = 10. Loop runs once (t=1 < 10) then exits (t=100 >= 10),
+  // so a non-null poll result is present when the deadline passes.
+  const times = [0, 1, 100];
+  let i = 0;
+  globalThis.fetch = stubFetch({
+    "/sessions": () => Response.json({ session_id: "sess-timeout" }),
+    "/session/sess-timeout/message": () => {
+      stopCalls += 1;
+      return Response.json({ ok: true });
+    },
+    "/session/sess-timeout": () => {
+      polls += 1;
+      return Response.json({ status_enum: "running" });
+    },
+  }) as typeof fetch;
+
+  try {
+    const env: Env = { DB: noopDb, DEVIN_API_KEY: "test-key" };
+    await assert.rejects(
+      runCriticSession(env, plan, "My task", {
+        pollIntervalMs: 1,
+        maxPollMs: 10,
+        now: () => times[Math.min(i++, times.length - 1)],
+      }),
+      /did not return a result before timeout/,
+    );
+    assert.equal(polls, 1);
+    assert.equal(stopCalls, 1);
+  } finally {
+    globalThis.fetch = original;
+  }
+});
+
 test("run_adversarial_review falls back to Modo A when the critic session fails", async () => {
   const original = globalThis.fetch;
   globalThis.fetch = stubFetch({
