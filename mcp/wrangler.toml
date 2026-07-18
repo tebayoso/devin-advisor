@@ -10,3 +10,13 @@ compatibility_flags = ["nodejs_compat"]
 binding = "DB"
 database_name = "devin_scope"
 database_id = "REPLACE_WITH_YOUR_D1_DATABASE_ID"
+
+# Cloudflare Workers AI binding used by decompose_task for model-backed
+# decomposition. Optional: without it the tool uses a deterministic heuristic.
+# Override the default model (@cf/meta/llama-3-8b-instruct) via the
+# DECOMPOSE_MODEL var below if desired.
+[ai]
+binding = "AI"
+
+# [vars]
+# DECOMPOSE_MODEL = "@cf/meta/llama-3-8b-instruct"
