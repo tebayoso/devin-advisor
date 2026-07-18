@@ -1,9 +1,14 @@
 import assert from "node:assert/strict";
+import { spawn } from "node:child_process";
+import { fileURLToPath } from "node:url";
+import { dirname, join } from "node:path";
 import { test } from "node:test";
 import { createLocalD1 } from "./local-store.js";
 import { handleRpc } from "./rpc.js";
 import { TOOL_DEFINITIONS } from "./tools.js";
 import type { Env } from "./types.js";
+
+const HERE = dirname(fileURLToPath(import.meta.url));
 
 function makeEnv(): Env {
   // Ephemeral, non-persisted local store (mirrors DEVIN_SCOPE_LOCAL_DB=":memory:").
@@ -85,4 +90,38 @@ test("save_memory / query_memory roundtrip through the local store", async () =>
   ) as { results: { key: string }[] };
   assert.equal(queried.results.length, 1);
   assert.equal(queried.results[0].key, "deploy");
+});
+
+test("stdio server survives malformed input and keeps serving", async () => {
+  const child = spawn(process.execPath, ["--import", "tsx", join(HERE, "stdio.ts")], {
+    env: { ...process.env, DEVIN_SCOPE_LOCAL_DB: ":memory:" },
+    stdio: ["pipe", "pipe", "inherit"],
+  });
+
+  let out = "";
+  child.stdout.setEncoding("utf8");
+  child.stdout.on("data", (chunk: string) => {
+    out += chunk;
+  });
+
+  // Malformed lines (valid JSON but not a request, then a syntax error) must NOT
+  // crash the long-lived server; a following valid request must still be answered.
+  child.stdin.write("null\n");
+  child.stdin.write("123\n");
+  child.stdin.write('{"foo":"bar"}\n');
+  child.stdin.write("{ not json\n");
+  child.stdin.write('{"jsonrpc":"2.0","id":9,"method":"initialize"}\n');
+  child.stdin.end();
+
+  const code: number | null = await new Promise((resolve) => child.on("close", resolve));
+  assert.equal(code, 0, "server should exit cleanly on stdin end, not crash");
+
+  const responses = out
+    .trim()
+    .split("\n")
+    .filter(Boolean)
+    .map((l) => JSON.parse(l) as { id: unknown; result?: { serverInfo?: { name: string } } });
+  const initialize = responses.find((r) => r.id === 9);
+  assert.ok(initialize, "valid request after malformed input should be answered");
+  assert.equal(initialize?.result?.serverInfo?.name, "devin-scope");
 });

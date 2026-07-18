@@ -24,6 +24,18 @@ function isNotification(req: JsonRpcRequest): boolean {
   return req.method.startsWith("notifications/") || req.id === undefined || req.id === null;
 }
 
+function parseRequest(line: string): JsonRpcRequest {
+  const parsed = JSON.parse(line) as unknown;
+  if (
+    typeof parsed !== "object" ||
+    parsed === null ||
+    typeof (parsed as { method?: unknown }).method !== "string"
+  ) {
+    throw new Error("Invalid Request");
+  }
+  return parsed as JsonRpcRequest;
+}
+
 async function main(): Promise<void> {
   const env: Env = { DB: createLocalD1(resolveDbPath()) };
   const rl = createInterface({ input: process.stdin });
@@ -34,16 +46,23 @@ async function main(): Promise<void> {
 
     let req: JsonRpcRequest;
     try {
-      req = JSON.parse(line) as JsonRpcRequest;
+      req = parseRequest(line);
     } catch {
       process.stdout.write(`${JSON.stringify(rpcError(null, -32700, "Parse error"))}\n`);
       continue;
     }
 
-    const response = await handleRpc(env, req);
-    // JSON-RPC notifications (no id) must not receive a response.
-    if (isNotification(req)) continue;
-    process.stdout.write(`${JSON.stringify(response)}\n`);
+    // Guard each request so one bad message cannot terminate the long-lived server.
+    try {
+      const response = await handleRpc(env, req);
+      // JSON-RPC notifications (no id) must not receive a response.
+      if (isNotification(req)) continue;
+      process.stdout.write(`${JSON.stringify(response)}\n`);
+    } catch (err) {
+      const message = err instanceof Error ? err.message : "Internal error";
+      const id = req.id ?? null;
+      process.stdout.write(`${JSON.stringify(rpcError(id, -32603, message))}\n`);
+    }
   }
 }
 
