@@ -8,6 +8,12 @@ export interface Env {
   // Optional shared Bearer token. When set, requests to /mcp must include
   // `Authorization: Bearer <AUTH_TOKEN>`. When unset, the server is public.
   AUTH_TOKEN?: string;
+  // Optional "Modo B" configuration. When DEVIN_API_KEY is set, the adversarial
+  // review can be delegated to a short, separate critic Devin session via the
+  // Devin REST API. Provided as a Worker secret; never hardcoded.
+  DEVIN_API_KEY?: string;
+  // Optional override for the Devin API base URL (defaults to the public API).
+  DEVIN_API_BASE_URL?: string;
 }
 
 export type Confidence = "high" | "medium" | "low";
@@ -85,6 +91,12 @@ export interface AdversarialReview {
   historicalInsights: string[];
   riskSummary: RiskSummary;
   confidenceAdjustment: string;
+  // How the review was produced: "in-agent" (Modo A) or "critic-session" (Modo B).
+  mode?: "in-agent" | "critic-session";
+  // URL of the critic Devin session, when Modo B was used.
+  criticSessionUrl?: string;
+  // Populated when Modo B was attempted but fell back to Modo A.
+  fallbackReason?: string;
 }
 
 export interface Plan {

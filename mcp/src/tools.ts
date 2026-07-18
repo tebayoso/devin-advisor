@@ -1,8 +1,10 @@
 import { getPlan, insertPlan, insertReview, queryMemory, saveMemory } from "./db.js";
 import { decomposeTask } from "./decompose.js";
+import { devinApiConfigured, runCriticSession } from "./devin.js";
 import { SCOPE_INSTRUCTIONS } from "./instructions.js";
 import { buildAdversarialReview, extractKeywords } from "./review.js";
 import type {
+  AdversarialReview,
   Decomposition,
   Env,
   MemoryEntry,
@@ -151,7 +153,27 @@ export async function callTool(
       if (!plan) throw new Error(`Plan not found: ${planId}`);
       const originalTask = str(args, "original_task") ?? plan.originalTask;
       const memory = await relevantMemory(env, plan.workspace, originalTask);
-      const review = buildAdversarialReview(originalTask, plan.decomposition, memory);
+
+      // Modo A: rich in-agent adversarial review (also the fallback for Modo B).
+      const buildModeA = (): AdversarialReview => ({
+        ...buildAdversarialReview(originalTask, plan.decomposition, memory),
+        mode: "in-agent",
+      });
+
+      let review: AdversarialReview;
+      // Modo B: delegate to a separate critic Devin session when configured,
+      // gracefully falling back to Modo A on any failure.
+      if (devinApiConfigured(env)) {
+        try {
+          review = await runCriticSession(env, plan, originalTask);
+        } catch (err) {
+          const reason = err instanceof Error ? err.message : "Critic session failed";
+          review = { ...buildModeA(), fallbackReason: reason };
+        }
+      } else {
+        review = buildModeA();
+      }
+
       const { id: reviewId } = await insertReview(env, planId, review);
       return { review_id: reviewId, plan_id: planId, ...review };
     }

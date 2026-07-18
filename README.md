@@ -55,12 +55,27 @@ Full design: [`docs/architecture.md`](docs/architecture.md).
 See [`examples/demo-script.md`](examples/demo-script.md) and
 [`examples/ambiguous-tasks.md`](examples/ambiguous-tasks.md).
 
+### Optional: adversarial critic session (Modo B)
+
+By default `run_adversarial_review` performs the review in-agent (Modo A). If you configure a Devin API
+key, the review is instead delegated to a short, separate critic Devin session via the Devin REST API,
+and the tool gracefully falls back to Modo A when the session is unavailable or fails:
+
+```bash
+cd mcp
+wrangler secret put DEVIN_API_KEY   # never commit this value
+```
+
+The review response includes a `mode` field (`in-agent` or `critic-session`) and, for Modo B, the
+`criticSessionUrl`.
+
 ## Local development
 
 ```bash
 cd mcp
 npm install
 npm run typecheck
+npm test           # runs the unit tests
 npm run dev        # local Worker on http://localhost:8787 (POST /mcp)
 ```
 
