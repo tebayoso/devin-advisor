@@ -1,10 +1,11 @@
-import { getPlan, insertPlan, queryMemory, saveMemory } from "./db.js";
+import { getPlan, insertPlan, insertReview, queryMemory, saveMemory } from "./db.js";
 import { decomposeTask } from "./decompose.js";
 import { SCOPE_INSTRUCTIONS } from "./instructions.js";
+import { buildAdversarialReview, extractKeywords } from "./review.js";
 import type {
-  AdversarialReview,
   Decomposition,
   Env,
+  MemoryEntry,
   ToolDefinition,
 } from "./types.js";
 
@@ -33,7 +34,7 @@ export const TOOL_DEFINITIONS: ToolDefinition[] = [
   {
     name: "run_adversarial_review",
     description:
-      "Produce a structured adversarial critique of a plan: weak assumptions, missing edge cases, risks, recommended changes.",
+      "Produce a structured, categorized adversarial critique of a saved plan: weak assumptions, missing edge cases, quantified/explained risk scores, recommended changes, and an overall confidence adjustment — informed by relevant historical memory. Persists the review to D1 linked to the plan.",
     inputSchema: {
       type: "object",
       properties: {
@@ -108,16 +109,24 @@ function str(args: Record<string, unknown>, key: string): string | undefined {
   return typeof v === "string" ? v : undefined;
 }
 
-// NOTE (scaffold): run_adversarial_review currently returns a deterministic
-// skeleton. Full model-backed generation is tracked in the roadmap issues.
-function skeletonReview(): AdversarialReview {
-  return {
-    weakAssumptions: ["The task description is complete."],
-    missingEdgeCases: ["Failure/error paths not yet enumerated."],
-    risks: [{ description: "Underspecified requirements", score: 3 }],
-    recommendedChanges: ["Add explicit acceptance criteria and edge-case subtasks."],
-    confidenceAdjustment: "Lower overall confidence until requirements are confirmed.",
-  };
+// Pull memory entries relevant to a task by querying the top keywords and
+// merging unique results (query_memory matches substrings, so per-keyword
+// queries retrieve far more useful history than the raw task string).
+async function relevantMemory(
+  env: Env,
+  workspace: string | null,
+  originalTask: string,
+): Promise<MemoryEntry[]> {
+  const keywords = extractKeywords(originalTask);
+  const queries = keywords.length ? keywords : [originalTask];
+  const byId = new Map<string, MemoryEntry>();
+  for (const q of queries) {
+    const results = await queryMemory(env, workspace, q);
+    for (const entry of results) {
+      if (!byId.has(entry.id)) byId.set(entry.id, entry);
+    }
+  }
+  return [...byId.values()];
 }
 
 export async function callTool(
@@ -138,7 +147,13 @@ export async function callTool(
     case "run_adversarial_review": {
       const planId = str(args, "plan_id");
       if (!planId) throw new Error("`plan_id` is required");
-      return skeletonReview();
+      const plan = await getPlan(env, planId);
+      if (!plan) throw new Error(`Plan not found: ${planId}`);
+      const originalTask = str(args, "original_task") ?? plan.originalTask;
+      const memory = await relevantMemory(env, plan.workspace, originalTask);
+      const review = buildAdversarialReview(originalTask, plan.decomposition, memory);
+      const { id: reviewId } = await insertReview(env, planId, review);
+      return { review_id: reviewId, plan_id: planId, ...review };
     }
 
     case "save_plan": {

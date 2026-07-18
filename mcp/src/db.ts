@@ -1,4 +1,4 @@
-import type { Env, MemoryEntry, Plan } from "./types.js";
+import type { AdversarialReview, Env, MemoryEntry, Plan } from "./types.js";
 
 function uuid(): string {
   return crypto.randomUUID();
@@ -54,6 +54,29 @@ export async function getPlan(env: Env, id: string): Promise<Plan | null> {
     confidenceSummary: row.confidence_summary,
     createdAt: row.created_at,
   };
+}
+
+export async function insertReview(
+  env: Env,
+  planId: string,
+  review: AdversarialReview,
+): Promise<{ id: string; createdAt: string }> {
+  const id = uuid();
+  const createdAt = nowIso();
+  await env.DB.prepare(
+    `INSERT INTO reviews (id, plan_id, critique, risks, missing_cases, created_at)
+     VALUES (?, ?, ?, ?, ?, ?)`,
+  )
+    .bind(
+      id,
+      planId,
+      JSON.stringify(review),
+      JSON.stringify(review.risks),
+      JSON.stringify(review.missingEdgeCases),
+      createdAt,
+    )
+    .run();
+  return { id, createdAt };
 }
 
 export async function saveMemory(

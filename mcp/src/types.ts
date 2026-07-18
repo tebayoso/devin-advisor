@@ -27,11 +27,60 @@ export interface Decomposition {
   confidenceSummary: string;
 }
 
+// Shared taxonomy for categorizing adversarial critiques (assumptions, edge
+// cases and risks) so reviews are consistent and filterable.
+export type CritiqueCategory =
+  | "requirements"
+  | "scope"
+  | "dependencies"
+  | "error-handling"
+  | "input-validation"
+  | "concurrency"
+  | "performance"
+  | "security"
+  | "data-integrity"
+  | "integration"
+  | "observability"
+  | "rollback"
+  | "testing";
+
+export type RiskLevel = "low" | "medium" | "high";
+
+export type RiskSeverity = "low" | "medium" | "high" | "critical";
+
+export interface CategorizedItem {
+  category: CritiqueCategory;
+  description: string;
+  relatedSubtasks: string[];
+}
+
+// Quantified, explained risk. `score` = likelihood(1-3) x impact(1-3) (1-9);
+// `severity` is derived from `score` via fixed thresholds.
+export interface ScoredRisk {
+  description: string;
+  category: CritiqueCategory;
+  likelihood: RiskLevel;
+  impact: RiskLevel;
+  score: number;
+  severity: RiskSeverity;
+  explanation: string;
+  relatedSubtasks: string[];
+}
+
+export interface RiskSummary {
+  riskCount: number;
+  overallScore: number;
+  highestSeverity: RiskSeverity;
+  scoringModel: string;
+}
+
 export interface AdversarialReview {
-  weakAssumptions: string[];
-  missingEdgeCases: string[];
-  risks: { description: string; score: number }[];
+  weakAssumptions: CategorizedItem[];
+  missingEdgeCases: CategorizedItem[];
+  risks: ScoredRisk[];
   recommendedChanges: string[];
+  historicalInsights: string[];
+  riskSummary: RiskSummary;
   confidenceAdjustment: string;
 }
 
