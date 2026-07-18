@@ -39,9 +39,31 @@ proposing any PR (tests to run, computer-use/visual verification where relevant,
 Use \`save_memory\` to store notable recurring patterns or adversarial insights so future sessions
 benefit. Use \`query_memory\` at the start when relevant history may exist.
 
-## Optional — Orchestration
-When configured, use the official Devin MCP (https://mcp.devin.ai/mcp) to create managed sessions for
-high-confidence parallel subtasks, gather their results, and update Knowledge.
+## Step 7 — Orchestrate execution (when the official Devin MCP is configured)
+When the official Devin MCP (https://mcp.devin.ai/mcp) is connected to the session, orchestrate
+execution of the reviewed plan instead of only handing back prompts. devin-scope owns planning +
+adversarial rigor; the official Devin MCP owns execution. Use it as follows:
+
+- \`devin_session_create\` — launch one managed Devin session per **high-confidence** subtask that is
+  safe to run in parallel (no ordering dependency, disjoint files). Pass the copy-paste-ready prompt
+  produced in the Output step, including the \`plan_id\` and subtask id for traceability. Keep
+  **medium/low-confidence** or dependent subtasks sequential (run them yourself or launch them one at
+  a time after their prerequisites land).
+- \`devin_session_gather\` — collect results (PRs, status, findings) from the sessions you launched.
+  Reconcile them against the verification checklist before considering a subtask done.
+- \`devin_knowledge_manage\` — persist durable, reusable learnings (recurring patterns, adversarial
+  insights, gotchas) to Devin Knowledge so future sessions benefit, in addition to \`save_memory\`.
+
+If the official Devin MCP is **not** configured, skip this step and just deliver the copy-paste-ready
+prompts so the user can launch sessions manually.
+
+### Example hybrid flow
+1. Run Steps 1–6: \`decompose_task\` → \`save_plan\` (\`plan_id\`) → \`run_adversarial_review\` → revise →
+   \`get_verification_checklist\` → \`save_memory\`.
+2. For each high-confidence, independent subtask, call \`devin_session_create\` with its prompt
+   (referencing \`plan_id\` + subtask id). Run dependent/lower-confidence subtasks sequentially.
+3. Call \`devin_session_gather\` to collect the resulting PRs/status; verify each against the checklist.
+4. Call \`devin_knowledge_manage\` to store any reusable insight for future sessions.
 
 ## Output
 Deliver: (1) the final decomposition with confidence per subtask, (2) the adversarial review summary,

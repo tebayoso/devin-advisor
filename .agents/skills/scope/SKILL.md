@@ -31,10 +31,31 @@ protocol below strictly and in order. Do not invent your own decomposition proce
 6. **Persist learnings** — Use `save_memory` for reusable insights; `query_memory` at the start when
    relevant history may exist.
 
-## Optional orchestration
+## Orchestration via the official Devin MCP
 
-When configured, use the official Devin MCP (`https://mcp.devin.ai/mcp`) to launch managed sessions
-for high-confidence parallel subtasks, gather results, and update Knowledge.
+When the official Devin MCP (`https://mcp.devin.ai/mcp`) is connected, orchestrate execution of the
+reviewed plan rather than only handing back prompts. devin-scope owns planning + adversarial rigor;
+the official Devin MCP owns execution.
+
+- `devin_session_create` — launch one managed Devin session per **high-confidence**, independent
+  subtask (no ordering dependency, disjoint files). Pass its copy-paste-ready prompt, including the
+  `plan_id` + subtask id. Keep medium/low-confidence or dependent subtasks sequential.
+- `devin_session_gather` — collect results (PRs, status, findings); reconcile each against the
+  verification checklist before treating a subtask as done.
+- `devin_knowledge_manage` — persist durable, reusable learnings to Devin Knowledge (in addition to
+  `save_memory`).
+
+If it is **not** configured, skip this and just deliver the prompts for manual launch.
+
+### Example hybrid flow
+1. Run steps 1–6 above to produce a reviewed plan with a `plan_id`.
+2. `devin_session_create` for each high-confidence, independent subtask (prompt references `plan_id`
+   + subtask id); run dependent/lower-confidence subtasks sequentially.
+3. `devin_session_gather` to collect the resulting PRs/status; verify against the checklist.
+4. `devin_knowledge_manage` to store any reusable insight.
+
+See [`examples/managed-orchestration.md`](../../../examples/managed-orchestration.md) for a full
+worked example.
 
 ## Output
 

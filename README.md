@@ -52,8 +52,10 @@ Full design: [`docs/architecture.md`](docs/architecture.md).
    discovered).
 4. **Use it**: `Scope this task: <your ambiguous task>`.
 
-See [`examples/demo-script.md`](examples/demo-script.md) and
-[`examples/ambiguous-tasks.md`](examples/ambiguous-tasks.md).
+See [`examples/demo-script.md`](examples/demo-script.md),
+[`examples/ambiguous-tasks.md`](examples/ambiguous-tasks.md), and
+[`examples/managed-orchestration.md`](examples/managed-orchestration.md) (hybrid flow with the
+official Devin MCP).
 
 ### Optional: adversarial critic session (Modo B)
 
