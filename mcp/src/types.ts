@@ -32,7 +32,7 @@ export interface AdversarialReview {
 
 export interface Plan {
   id: string;
-  workspace: string | null;
+  workspace: string;
   originalTask: string;
   decomposition: Decomposition;
   confidenceSummary: string | null;
@@ -41,7 +41,7 @@ export interface Plan {
 
 export interface MemoryEntry {
   id: string;
-  workspace: string | null;
+  workspace: string;
   key: string;
   value: string;
   tags: string[];

@@ -1,4 +1,10 @@
-import { getPlan, insertPlan, queryMemory, saveMemory } from "./db.js";
+import {
+  getPlan,
+  insertPlan,
+  normalizeWorkspace,
+  queryMemory,
+  saveMemory,
+} from "./db.js";
 import { SCOPE_INSTRUCTIONS } from "./instructions.js";
 import type {
   AdversarialReview,
@@ -38,6 +44,10 @@ export const TOOL_DEFINITIONS: ToolDefinition[] = [
       properties: {
         plan_id: { type: "string", description: "Id returned by save_plan." },
         original_task: { type: "string", description: "The original task for context." },
+        workspace: {
+          type: "string",
+          description: "Workspace the plan belongs to. Must match the plan's workspace.",
+        },
       },
       required: ["plan_id"],
       additionalProperties: false,
@@ -59,10 +69,16 @@ export const TOOL_DEFINITIONS: ToolDefinition[] = [
   },
   {
     name: "get_plan",
-    description: "Retrieve a previously saved plan by plan_id.",
+    description: "Retrieve a previously saved plan by plan_id, scoped to its workspace.",
     inputSchema: {
       type: "object",
-      properties: { plan_id: { type: "string" } },
+      properties: {
+        plan_id: { type: "string" },
+        workspace: {
+          type: "string",
+          description: "Workspace the plan belongs to. Must match the plan's workspace.",
+        },
+      },
       required: ["plan_id"],
       additionalProperties: false,
     },
@@ -155,6 +171,11 @@ export async function callTool(
     case "run_adversarial_review": {
       const planId = str(args, "plan_id");
       if (!planId) throw new Error("`plan_id` is required");
+      const workspace = normalizeWorkspace(str(args, "workspace"));
+      // Verify the plan exists in the caller's workspace before reviewing it so
+      // a plan_id from another workspace cannot be reviewed cross-tenant.
+      const plan = await getPlan(env, planId, workspace);
+      if (!plan) throw new Error(`Plan not found: ${planId}`);
       return skeletonReview();
     }
 
@@ -165,7 +186,7 @@ export async function callTool(
         throw new Error("`original_task` and `decomposition` are required");
       }
       const plan = await insertPlan(env, {
-        workspace: str(args, "workspace") ?? null,
+        workspace: normalizeWorkspace(str(args, "workspace")),
         originalTask,
         decomposition,
         confidenceSummary: decomposition.confidenceSummary ?? null,
@@ -176,7 +197,7 @@ export async function callTool(
     case "get_plan": {
       const planId = str(args, "plan_id");
       if (!planId) throw new Error("`plan_id` is required");
-      const plan = await getPlan(env, planId);
+      const plan = await getPlan(env, planId, normalizeWorkspace(str(args, "workspace")));
       if (!plan) throw new Error(`Plan not found: ${planId}`);
       return plan;
     }
@@ -187,7 +208,7 @@ export async function callTool(
       if (!key || !value) throw new Error("`key` and `value` are required");
       const tags = Array.isArray(args.tags) ? (args.tags as string[]) : [];
       const entry = await saveMemory(env, {
-        workspace: str(args, "workspace") ?? null,
+        workspace: normalizeWorkspace(str(args, "workspace")),
         key,
         value,
         tags,
@@ -198,7 +219,7 @@ export async function callTool(
     case "query_memory": {
       const query = str(args, "query");
       if (!query) throw new Error("`query` is required");
-      const results = await queryMemory(env, str(args, "workspace") ?? null, query);
+      const results = await queryMemory(env, normalizeWorkspace(str(args, "workspace")), query);
       return { results };
     }
 
