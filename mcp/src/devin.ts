@@ -198,6 +198,7 @@ export async function runCriticSession(
   try {
     const deadline = now() + maxPollMs;
     let detail: SessionDetail | null = null;
+    let done = false;
     while (now() < deadline) {
       await sleep(pollIntervalMs);
       const res = await fetch(`${url}/session/${created.session_id}`, { headers });
@@ -207,11 +208,12 @@ export async function runCriticSession(
       detail = (await res.json()) as SessionDetail;
       const status = detail.status_enum?.toLowerCase();
       if (detail.structured_output || (status && TERMINAL_STATUSES.has(status))) {
+        done = true;
         break;
       }
     }
 
-    if (!detail) {
+    if (!done || !detail) {
       throw new Error("Critic session did not return a result before timeout");
     }
     const review = parseAdversarialReview(detail.structured_output);

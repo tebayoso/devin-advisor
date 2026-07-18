@@ -136,17 +136,24 @@ test("runCriticSession creates a session, polls, and returns a critic-session re
   }
 });
 
-test("runCriticSession stops the session and throws when it times out", async () => {
+test("runCriticSession stops the session and throws a timeout after polling", async () => {
   const original = globalThis.fetch;
   let stopCalls = 0;
-  let clock = 0;
+  let polls = 0;
+  // Deadline = 0 + 10 = 10. Loop runs once (t=1 < 10) then exits (t=100 >= 10),
+  // so a non-null poll result is present when the deadline passes.
+  const times = [0, 1, 100];
+  let i = 0;
   globalThis.fetch = stubFetch({
     "/sessions": () => Response.json({ session_id: "sess-timeout" }),
     "/session/sess-timeout/message": () => {
       stopCalls += 1;
       return Response.json({ ok: true });
     },
-    "/session/sess-timeout": () => Response.json({ status_enum: "running" }),
+    "/session/sess-timeout": () => {
+      polls += 1;
+      return Response.json({ status_enum: "running" });
+    },
   }) as typeof fetch;
 
   try {
@@ -154,11 +161,12 @@ test("runCriticSession stops the session and throws when it times out", async ()
     await assert.rejects(
       runCriticSession(env, plan, "My task", {
         pollIntervalMs: 1,
-        maxPollMs: 5,
-        now: () => (clock += 10),
+        maxPollMs: 10,
+        now: () => times[Math.min(i++, times.length - 1)],
       }),
-      /timeout/,
+      /did not return a result before timeout/,
     );
+    assert.equal(polls, 1);
     assert.equal(stopCalls, 1);
   } finally {
     globalThis.fetch = original;
