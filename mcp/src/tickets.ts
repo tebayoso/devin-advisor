@@ -70,6 +70,18 @@ export interface TicketClient {
   postComment(id: string, body: string): Promise<{ url?: string }>;
 }
 
+// ADF block-level nodes whose text should end with a newline so they don't run
+// together when a Jira description is flattened.
+const ADF_BLOCK_TYPES = new Set([
+  "paragraph",
+  "heading",
+  "blockquote",
+  "codeBlock",
+  "listItem",
+  "bulletList",
+  "orderedList",
+]);
+
 /** Flatten Atlassian Document Format (or a plain string) into readable text. */
 export function adfToText(node: unknown): string {
   if (node == null) return "";
@@ -77,10 +89,11 @@ export function adfToText(node: unknown): string {
   if (Array.isArray(node)) return node.map(adfToText).join("");
   if (typeof node === "object") {
     const n = node as { type?: string; text?: string; content?: unknown };
-    const inner = adfToText(n.content);
-    if (n.type === "paragraph") return `${inner}\n`;
     if (n.type === "hardBreak") return "\n";
     if (typeof n.text === "string") return n.text;
+    const inner = adfToText(n.content);
+    if (n.type === "listItem") return `- ${inner.trim()}\n`;
+    if (n.type && ADF_BLOCK_TYPES.has(n.type)) return `${inner}\n`;
     return inner;
   }
   return "";

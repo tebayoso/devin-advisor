@@ -55,6 +55,24 @@ test("adfToText flattens an ADF document", () => {
   assert.equal(adfToText(doc).trim(), "Hello\nWorld");
 });
 
+test("adfToText separates headings and list items with newlines", () => {
+  const doc = {
+    type: "doc",
+    content: [
+      { type: "heading", content: [{ type: "text", text: "Goals" }] },
+      {
+        type: "bulletList",
+        content: [
+          { type: "listItem", content: [{ type: "paragraph", content: [{ type: "text", text: "First" }] }] },
+          { type: "listItem", content: [{ type: "paragraph", content: [{ type: "text", text: "Second" }] }] },
+        ],
+      },
+    ],
+  };
+  const lines = adfToText(doc).split("\n").filter(Boolean);
+  assert.deepEqual(lines, ["Goals", "- First", "- Second"]);
+});
+
 test("Linear client fetches a ticket via GraphQL", async () => {
   const calls: RequestInit[] = [];
   const fetchImpl = (async (_url: string, init: RequestInit) => {
