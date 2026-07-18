@@ -98,6 +98,66 @@ export function extractKeywords(text: string, limit = 6): string[] {
   return words;
 }
 
+// Lightweight suffix stripper (longest match wins) so plural/verb variants of a
+// word collapse to a shared root (e.g. "sessions" -> "session").
+const STEM_SUFFIXES = ["ications", "ication", "izations", "ization", "ing", "ers", "ies", "ion", "ed", "es", "er", "s"];
+
+export function stem(token: string): string {
+  for (const suffix of STEM_SUFFIXES) {
+    if (token.endsWith(suffix) && token.length - suffix.length >= 3) {
+      return token.slice(0, -suffix.length);
+    }
+  }
+  return token;
+}
+
+function tokenize(text: string): string[] {
+  const seen = new Set<string>();
+  const tokens: string[] = [];
+  for (const raw of text.toLowerCase().split(/[^a-z0-9]+/)) {
+    if (raw.length < 4 || STOPWORDS.has(raw) || seen.has(raw)) continue;
+    seen.add(raw);
+    tokens.push(raw);
+  }
+  return tokens;
+}
+
+// Two tokens are considered related if equal, share a stem, or one contains the
+// other (bidirectional substring, e.g. "oauth" <-> "auth").
+export function tokensMatch(a: string, b: string): boolean {
+  if (a === b) return true;
+  if (stem(a) === stem(b)) return true;
+  if (a.length >= 4 && b.length >= 4 && (a.includes(b) || b.includes(a))) return true;
+  return false;
+}
+
+export function memoryRelevance(entry: MemoryEntry, taskTokens: string[]): number {
+  const memoryTokens = tokenize(`${entry.key} ${entry.value} ${entry.tags.join(" ")}`);
+  let score = 0;
+  for (const t of taskTokens) {
+    if (memoryTokens.some((m) => tokensMatch(t, m))) score += 1;
+  }
+  return score;
+}
+
+/**
+ * Filter and rank candidate memory entries by relevance to the task using
+ * stem- and substring-aware token matching. Deterministic; ties break by id.
+ */
+export function rankMemoryByRelevance(
+  entries: MemoryEntry[],
+  taskText: string,
+  limit = 8,
+): MemoryEntry[] {
+  const tokens = tokenize(taskText);
+  return entries
+    .map((entry) => ({ entry, score: memoryRelevance(entry, tokens) }))
+    .filter((r) => r.score > 0)
+    .sort((a, b) => b.score - a.score || a.entry.id.localeCompare(b.entry.id))
+    .slice(0, limit)
+    .map((r) => r.entry);
+}
+
 function planText(originalTask: string, d: Decomposition): string {
   return [
     originalTask,

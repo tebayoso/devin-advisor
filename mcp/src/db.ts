@@ -94,6 +94,38 @@ export async function saveMemory(
   return { ...entry, id, createdAt };
 }
 
+export async function listMemory(
+  env: Env,
+  workspace: string | null,
+  limit = 100,
+): Promise<MemoryEntry[]> {
+  const { results } = await env.DB.prepare(
+    `SELECT id, workspace, key, value, tags, created_at
+     FROM memory
+     WHERE (workspace IS ? OR ? IS NULL)
+     ORDER BY created_at DESC
+     LIMIT ?`,
+  )
+    .bind(workspace, workspace, limit)
+    .all<{
+      id: string;
+      workspace: string | null;
+      key: string;
+      value: string;
+      tags: string | null;
+      created_at: string;
+    }>();
+
+  return results.map((row) => ({
+    id: row.id,
+    workspace: row.workspace,
+    key: row.key,
+    value: row.value,
+    tags: row.tags ? row.tags.split(",").filter(Boolean) : [],
+    createdAt: row.created_at,
+  }));
+}
+
 export async function queryMemory(
   env: Env,
   workspace: string | null,

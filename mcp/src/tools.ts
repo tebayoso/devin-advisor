@@ -1,6 +1,17 @@
-import { getPlan, insertPlan, insertReview, queryMemory, saveMemory } from "./db.js";
+import {
+  getPlan,
+  insertPlan,
+  insertReview,
+  listMemory,
+  queryMemory,
+  saveMemory,
+} from "./db.js";
 import { SCOPE_INSTRUCTIONS } from "./instructions.js";
-import { buildAdversarialReview, extractKeywords } from "./review.js";
+import {
+  buildAdversarialReview,
+  extractKeywords,
+  rankMemoryByRelevance,
+} from "./review.js";
 import type {
   Decomposition,
   Env,
@@ -128,24 +139,25 @@ function skeletonDecomposition(task: string): Decomposition {
   };
 }
 
-// Pull memory entries relevant to a task by querying the top keywords and
-// merging unique results (query_memory matches substrings, so per-keyword
-// queries retrieve far more useful history than the raw task string).
+// Gather memory relevant to a task. `query_memory` only matches when a stored
+// entry *contains* the query substring, so we combine per-keyword queries with
+// a recent-memory scan and then rank locally with stem/substring-aware matching
+// (so e.g. an "oauth" task still surfaces an "auth" memory).
 async function relevantMemory(
   env: Env,
   workspace: string | null,
   originalTask: string,
 ): Promise<MemoryEntry[]> {
-  const keywords = extractKeywords(originalTask);
-  const queries = keywords.length ? keywords : [originalTask];
   const byId = new Map<string, MemoryEntry>();
-  for (const q of queries) {
-    const results = await queryMemory(env, workspace, q);
-    for (const entry of results) {
-      if (!byId.has(entry.id)) byId.set(entry.id, entry);
+  for (const keyword of extractKeywords(originalTask)) {
+    for (const entry of await queryMemory(env, workspace, keyword)) {
+      byId.set(entry.id, entry);
     }
   }
-  return [...byId.values()];
+  for (const entry of await listMemory(env, workspace)) {
+    byId.set(entry.id, entry);
+  }
+  return rankMemoryByRelevance([...byId.values()], originalTask);
 }
 
 export async function callTool(

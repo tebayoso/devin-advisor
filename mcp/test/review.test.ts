@@ -4,8 +4,11 @@ import { test } from "node:test";
 import {
   buildAdversarialReview,
   extractKeywords,
+  rankMemoryByRelevance,
   riskScore,
   severityFromScore,
+  stem,
+  tokensMatch,
 } from "../src/review.ts";
 import type { Decomposition, MemoryEntry } from "../src/types.ts";
 
@@ -123,6 +126,49 @@ test("risk summary reports the scoring model and aggregate score", () => {
   assert.ok(review.riskSummary.scoringModel.includes("likelihood"));
   assert.equal(review.riskSummary.riskCount, review.risks.length);
   assert.ok(review.riskSummary.overallScore > 0);
+});
+
+const mem = (over: Partial<MemoryEntry> & { id: string }): MemoryEntry => ({
+  workspace: null,
+  key: "",
+  value: "",
+  tags: [],
+  createdAt: "2024-01-01T00:00:00.000Z",
+  ...over,
+});
+
+test("stem collapses common plural/verb suffixes", () => {
+  assert.equal(stem("sessions"), "session");
+  assert.equal(stem("deleting"), "delet");
+  assert.equal(stem("migrations"), "migration");
+  assert.equal(stem("auth"), "auth");
+});
+
+test("tokensMatch is stem- and substring-aware (bidirectional)", () => {
+  assert.ok(tokensMatch("oauth", "auth"));
+  assert.ok(tokensMatch("auth", "oauth"));
+  assert.ok(tokensMatch("sessions", "session"));
+  assert.ok(!tokensMatch("oauth", "cache"));
+  assert.ok(!tokensMatch("api", "cli")); // too short to substring-match
+});
+
+test("rankMemoryByRelevance surfaces auth history for an oauth task", () => {
+  const entries: MemoryEntry[] = [
+    mem({ id: "m1", key: "auth-timeouts", value: "token refresh failures", tags: ["auth"] }),
+    mem({ id: "m2", key: "unrelated", value: "styling tweaks", tags: ["ui"] }),
+  ];
+  const ranked = rankMemoryByRelevance(entries, "Add an OAuth login endpoint");
+  assert.equal(ranked.length, 1);
+  assert.equal(ranked[0]?.id, "m1");
+});
+
+test("rankMemoryByRelevance ranks by match count and is deterministic", () => {
+  const entries: MemoryEntry[] = [
+    mem({ id: "b", key: "auth", value: "generic auth note" }),
+    mem({ id: "a", key: "auth-sessions", value: "auth session refresh" }),
+  ];
+  const ranked = rankMemoryByRelevance(entries, "Fix auth session refresh");
+  assert.deepEqual(ranked.map((e) => e.id), ["a", "b"]);
 });
 
 test("extractKeywords drops stopwords and short tokens", () => {
