@@ -20,6 +20,8 @@ protocol below strictly and in order. Do not invent your own decomposition proce
 1. **Decompose** — Call `decompose_task` with the original task (plus repo/context). Produce
    3–7 concrete subtasks, each with a confidence level (high | medium | low) and short
    justification, and a recommended execution strategy (parallel / sequential / managed Devins).
+   The response also returns `routing` suggestions (model tier, local vs cloud, and how many parallel
+   managed Devins) derived from each subtask's confidence and the estimated complexity.
 2. **Persist** — Call `save_plan` to store the decomposition and get a `plan_id`.
 3. **Adversarial review (MANDATORY)** — Call `run_adversarial_review` for the plan. Surface weak
    assumptions, missing edge cases, risks (with severity), recommended changes, and an overall
@@ -39,4 +41,5 @@ for high-confidence parallel subtasks, gather results, and update Knowledge.
 ## Output
 
 Deliver: the final decomposition with per-subtask confidence, the adversarial review summary, the
-execution strategy, the verification checklist, and copy-paste-ready prompts for each subtask.
+execution strategy and routing suggestions (model tier, local vs cloud, parallel managed Devins), the
+verification checklist, and copy-paste-ready prompts for each subtask.
