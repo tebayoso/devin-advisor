@@ -1,4 +1,5 @@
 import { getPlan, insertPlan, queryMemory, saveMemory } from "./db.js";
+import { devinApiConfigured, runCriticSession } from "./devin.js";
 import { SCOPE_INSTRUCTIONS } from "./instructions.js";
 import type {
   AdversarialReview,
@@ -134,6 +135,7 @@ function skeletonReview(): AdversarialReview {
     risks: [{ description: "Underspecified requirements", score: 3 }],
     recommendedChanges: ["Add explicit acceptance criteria and edge-case subtasks."],
     confidenceAdjustment: "Lower overall confidence until requirements are confirmed.",
+    mode: "in-agent",
   };
 }
 
@@ -155,6 +157,20 @@ export async function callTool(
     case "run_adversarial_review": {
       const planId = str(args, "plan_id");
       if (!planId) throw new Error("`plan_id` is required");
+      const originalTask = str(args, "original_task");
+
+      // Modo B: delegate to a separate critic Devin session when configured,
+      // gracefully falling back to Modo A (in-agent skeleton) on any failure.
+      if (devinApiConfigured(env)) {
+        try {
+          const plan = await getPlan(env, planId);
+          return await runCriticSession(env, plan, originalTask);
+        } catch (err) {
+          const reason = err instanceof Error ? err.message : "Critic session failed";
+          return { ...skeletonReview(), fallbackReason: reason };
+        }
+      }
+
       return skeletonReview();
     }
 
