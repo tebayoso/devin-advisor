@@ -77,16 +77,18 @@ export async function insertReview(
   env: Env,
   planId: string,
   review: AdversarialReview,
+  workspace: string | null | undefined,
 ): Promise<{ id: string; createdAt: string }> {
   const id = uuid();
   const createdAt = nowIso();
   await env.DB.prepare(
-    `INSERT INTO reviews (id, plan_id, critique, risks, missing_cases, created_at)
-     VALUES (?, ?, ?, ?, ?, ?)`,
+    `INSERT INTO reviews (id, plan_id, workspace, critique, risks, missing_cases, created_at)
+     VALUES (?, ?, ?, ?, ?, ?, ?)`,
   )
     .bind(
       id,
       planId,
+      normalizeWorkspace(workspace),
       JSON.stringify(review),
       JSON.stringify(review.risks),
       JSON.stringify(review.missingEdgeCases),

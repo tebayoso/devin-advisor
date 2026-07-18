@@ -44,10 +44,33 @@ function goodPlan(overrides: Partial<Plan> = {}): Plan {
 }
 
 const goodReview: AdversarialReview = {
-  weakAssumptions: ["Traffic patterns are uniform"],
-  missingEdgeCases: ["Burst traffic", "Distributed counters"],
-  risks: [{ description: "Counter drift across edges", score: 3 }],
+  weakAssumptions: [
+    { category: "requirements", description: "Traffic patterns are uniform", relatedSubtasks: [] },
+  ],
+  missingEdgeCases: [
+    { category: "concurrency", description: "Burst traffic", relatedSubtasks: [] },
+    { category: "data-integrity", description: "Distributed counters", relatedSubtasks: [] },
+  ],
+  risks: [
+    {
+      description: "Counter drift across edges",
+      category: "data-integrity",
+      likelihood: "medium",
+      impact: "high",
+      score: 6,
+      severity: "high",
+      explanation: "Edge-local counters can diverge without a shared store.",
+      relatedSubtasks: [],
+    },
+  ],
   recommendedChanges: ["Use a shared store for counters"],
+  historicalInsights: [],
+  riskSummary: {
+    riskCount: 1,
+    overallScore: 6,
+    highestSeverity: "high",
+    scoringModel: "likelihood(1-3) x impact(1-3)",
+  },
   confidenceAdjustment: "Confidence holds after adding a shared store subtask.",
 };
 
@@ -84,7 +107,21 @@ test("skeleton confidence summary fails the summary check", () => {
 });
 
 test("unaddressed high-severity risk is flagged when not incorporated", () => {
-  const review: AdversarialReview = { ...goodReview, risks: [{ description: "Data loss", score: 5 }] };
+  const review: AdversarialReview = {
+    ...goodReview,
+    risks: [
+      {
+        description: "Data loss",
+        category: "data-integrity",
+        likelihood: "high",
+        impact: "high",
+        score: 9,
+        severity: "critical",
+        explanation: "Unbounded writes can drop data under load.",
+        relatedSubtasks: [],
+      },
+    ],
+  };
   const a = assessPlanQuality({ plan: goodPlan(), review, reviewIncorporated: false });
   assert.equal(a.checks.find((c) => c.id === "risks_addressed")?.passed, false);
 });
@@ -124,6 +161,11 @@ test("artifact builders are deterministic and well-formed", () => {
   const k = buildKnowledgeArtifact(goodPlan(), goodReview);
   assert.ok(k.name.startsWith("devin-scope plan:"));
   assert.ok(k.triggerDescription.length > 0);
+  // Review items are structured objects; the artifact must render their
+  // descriptions, never "[object Object]".
+  assert.ok(k.body.includes("Traffic patterns are uniform"));
+  assert.ok(k.body.includes("Burst traffic"));
+  assert.ok(!k.body.includes("[object Object]"));
   const p = buildPlaybookArtifact(goodPlan(), goodReview);
   assert.ok(p.content.includes("## Steps"));
 });

@@ -192,10 +192,14 @@ function reviewLines(review?: AdversarialReview): string {
   if (!review) return "_No adversarial review recorded._";
   const parts: string[] = [];
   if (review.weakAssumptions?.length) {
-    parts.push(`- Weak assumptions: ${review.weakAssumptions.join("; ")}`);
+    parts.push(
+      `- Weak assumptions: ${review.weakAssumptions.map((w) => w.description).join("; ")}`,
+    );
   }
   if (review.missingEdgeCases?.length) {
-    parts.push(`- Edge cases covered: ${review.missingEdgeCases.join("; ")}`);
+    parts.push(
+      `- Edge cases covered: ${review.missingEdgeCases.map((e) => e.description).join("; ")}`,
+    );
   }
   if (review.risks?.length) {
     parts.push(

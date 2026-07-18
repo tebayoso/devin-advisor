@@ -290,7 +290,7 @@ export async function callTool(
         review = buildModeA();
       }
 
-      const { id: reviewId } = await insertReview(env, planId, review);
+      const { id: reviewId } = await insertReview(env, planId, review, plan.workspace);
       return { review_id: reviewId, plan_id: planId, ...review };
     }
 
