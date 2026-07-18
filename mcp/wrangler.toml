@@ -1,0 +1,12 @@
+name = "devin-scope"
+main = "src/index.ts"
+compatibility_date = "2024-07-12"
+compatibility_flags = ["nodejs_compat"]
+
+# Cloudflare D1 binding. Create the database with:
+#   wrangler d1 create devin_scope
+# then paste the returned database_id below.
+[[d1_databases]]
+binding = "DB"
+database_name = "devin_scope"
+database_id = "REPLACE_WITH_YOUR_D1_DATABASE_ID"
