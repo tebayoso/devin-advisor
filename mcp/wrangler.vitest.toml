@@ -1,0 +1,14 @@
+# Minimal Worker config used only by the vitest-pool-workers integration tests.
+# It intentionally omits the production custom-domain route and the [ai] binding
+# so the tests run against an isolated miniflare runtime with a local D1 database.
+# With no AI binding present, decompose_task exercises its deterministic
+# heuristic fallback path.
+name = "devin-scope"
+main = "src/index.ts"
+compatibility_date = "2024-07-12"
+compatibility_flags = ["nodejs_compat"]
+
+[[d1_databases]]
+binding = "DB"
+database_name = "devin_scope"
+database_id = "db225267-1030-4869-9530-b7cfdc4ff586"

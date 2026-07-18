@@ -1,4 +1,4 @@
-import type { Env, MemoryEntry, Plan } from "./types.js";
+import type { AdversarialReview, Env, MemoryEntry, Plan } from "./types.js";
 
 function uuid(): string {
   return crypto.randomUUID();
@@ -8,37 +8,54 @@ function nowIso(): string {
   return new Date().toISOString();
 }
 
+// Canonical workspace used when a caller does not provide one. Every row is
+// scoped to a concrete workspace so that a missing/empty workspace behaves like
+// a real tenant bucket instead of an implicit "match anything" wildcard.
+export const DEFAULT_WORKSPACE = "default";
+
+// Normalize a caller-supplied workspace into a concrete, non-empty id. This is
+// the single source of truth for workspace scoping across every tool and query.
+export function normalizeWorkspace(workspace: string | null | undefined): string {
+  const trimmed = workspace?.trim();
+  return trimmed ? trimmed : DEFAULT_WORKSPACE;
+}
+
 export async function insertPlan(
   env: Env,
   plan: Omit<Plan, "id" | "createdAt">,
 ): Promise<Plan> {
   const id = uuid();
   const createdAt = nowIso();
+  const workspace = normalizeWorkspace(plan.workspace);
   await env.DB.prepare(
     `INSERT INTO plans (id, workspace, original_task, decomposition, confidence_summary, created_at)
      VALUES (?, ?, ?, ?, ?, ?)`,
   )
     .bind(
       id,
-      plan.workspace,
+      workspace,
       plan.originalTask,
       JSON.stringify(plan.decomposition),
       plan.confidenceSummary,
       createdAt,
     )
     .run();
-  return { ...plan, id, createdAt };
+  return { ...plan, workspace, id, createdAt };
 }
 
-export async function getPlan(env: Env, id: string): Promise<Plan | null> {
+export async function getPlan(
+  env: Env,
+  id: string,
+  workspace: string | null | undefined,
+): Promise<Plan | null> {
   const row = await env.DB.prepare(
     `SELECT id, workspace, original_task, decomposition, confidence_summary, created_at
-     FROM plans WHERE id = ?`,
+     FROM plans WHERE id = ? AND workspace = ?`,
   )
-    .bind(id)
+    .bind(id, normalizeWorkspace(workspace))
     .first<{
       id: string;
-      workspace: string | null;
+      workspace: string;
       original_task: string;
       decomposition: string;
       confidence_summary: string | null;
@@ -56,39 +73,65 @@ export async function getPlan(env: Env, id: string): Promise<Plan | null> {
   };
 }
 
+export async function insertReview(
+  env: Env,
+  planId: string,
+  review: AdversarialReview,
+  workspace: string | null | undefined,
+): Promise<{ id: string; createdAt: string }> {
+  const id = uuid();
+  const createdAt = nowIso();
+  await env.DB.prepare(
+    `INSERT INTO reviews (id, plan_id, workspace, critique, risks, missing_cases, created_at)
+     VALUES (?, ?, ?, ?, ?, ?, ?)`,
+  )
+    .bind(
+      id,
+      planId,
+      normalizeWorkspace(workspace),
+      JSON.stringify(review),
+      JSON.stringify(review.risks),
+      JSON.stringify(review.missingEdgeCases),
+      createdAt,
+    )
+    .run();
+  return { id, createdAt };
+}
+
 export async function saveMemory(
   env: Env,
   entry: Omit<MemoryEntry, "id" | "createdAt">,
 ): Promise<MemoryEntry> {
   const id = uuid();
   const createdAt = nowIso();
+  const workspace = normalizeWorkspace(entry.workspace);
   await env.DB.prepare(
     `INSERT INTO memory (id, workspace, key, value, tags, created_at)
      VALUES (?, ?, ?, ?, ?, ?)`,
   )
-    .bind(id, entry.workspace, entry.key, entry.value, entry.tags.join(","), createdAt)
+    .bind(id, workspace, entry.key, entry.value, entry.tags.join(","), createdAt)
     .run();
-  return { ...entry, id, createdAt };
+  return { ...entry, workspace, id, createdAt };
 }
 
 export async function queryMemory(
   env: Env,
-  workspace: string | null,
+  workspace: string | null | undefined,
   query: string,
 ): Promise<MemoryEntry[]> {
   const like = `%${query}%`;
   const { results } = await env.DB.prepare(
     `SELECT id, workspace, key, value, tags, created_at
      FROM memory
-     WHERE (workspace IS ? OR ? IS NULL)
+     WHERE workspace = ?
        AND (key LIKE ? OR value LIKE ? OR tags LIKE ?)
      ORDER BY created_at DESC
      LIMIT 25`,
   )
-    .bind(workspace, workspace, like, like, like)
+    .bind(normalizeWorkspace(workspace), like, like, like)
     .all<{
       id: string;
-      workspace: string | null;
+      workspace: string;
       key: string;
       value: string;
       tags: string | null;

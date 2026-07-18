@@ -3,7 +3,17 @@
 // fall back to "Modo A" (the in-agent structured prompt). No secrets are hardcoded:
 // the key is read from the Worker environment (env.DEVIN_API_KEY).
 
-import type { AdversarialReview, Env, Plan } from "./types.js";
+import { riskScore, severityFromScore, SCORING_MODEL } from "./review.js";
+import type {
+  AdversarialReview,
+  CategorizedItem,
+  CritiqueCategory,
+  Env,
+  Plan,
+  RiskLevel,
+  RiskSeverity,
+  ScoredRisk,
+} from "./types.js";
 
 const DEFAULT_BASE_URL = "https://api.devin.ai/v1";
 const POLL_INTERVAL_MS = 5_000;
@@ -48,9 +58,21 @@ export function buildCriticPrompt(originalTask: string | undefined, plan: Plan |
     "When finished, call provide_structured_output with EXACTLY this JSON shape:",
     JSON.stringify(
       {
-        weakAssumptions: ["string"],
-        missingEdgeCases: ["string"],
-        risks: [{ description: "string", score: 1 }],
+        weakAssumptions: [
+          { category: "requirements", description: "string", relatedSubtasks: ["s1"] },
+        ],
+        missingEdgeCases: [
+          { category: "error-handling", description: "string", relatedSubtasks: [] },
+        ],
+        risks: [
+          {
+            description: "string",
+            category: "security",
+            likelihood: "low|medium|high",
+            impact: "low|medium|high",
+            explanation: "string",
+          },
+        ],
         recommendedChanges: ["string"],
         confidenceAdjustment: "string",
       },
@@ -67,52 +89,141 @@ function asStringArray(value: unknown): string[] {
   return value.filter((v): v is string => typeof v === "string");
 }
 
-function asRisks(value: unknown): { description: string; score: number }[] {
+const VALID_CATEGORIES: ReadonlySet<string> = new Set<CritiqueCategory>([
+  "requirements", "scope", "dependencies", "error-handling", "input-validation",
+  "concurrency", "performance", "security", "data-integrity", "integration",
+  "observability", "rollback", "testing",
+]);
+
+const SEVERITY_ORDER: RiskSeverity[] = ["low", "medium", "high", "critical"];
+
+function asCategory(value: unknown): CritiqueCategory {
+  return typeof value === "string" && VALID_CATEGORIES.has(value)
+    ? (value as CritiqueCategory)
+    : "requirements";
+}
+
+function asRiskLevel(value: unknown, fallback: RiskLevel = "medium"): RiskLevel {
+  return value === "low" || value === "medium" || value === "high" ? value : fallback;
+}
+
+// Accept either a list of strings or of {category, description, relatedSubtasks}
+// objects and normalize into the categorized shape the current schema expects.
+function asCategorizedItems(value: unknown): CategorizedItem[] {
   if (!Array.isArray(value)) return [];
-  const risks: { description: string; score: number }[] = [];
+  const items: CategorizedItem[] = [];
   for (const item of value) {
-    if (item && typeof item === "object") {
+    if (typeof item === "string") {
+      items.push({ category: "requirements", description: item, relatedSubtasks: [] });
+    } else if (item && typeof item === "object") {
       const rec = item as Record<string, unknown>;
       const description = typeof rec.description === "string" ? rec.description : undefined;
-      const score = typeof rec.score === "number" ? rec.score : undefined;
-      if (description !== undefined) {
-        risks.push({ description, score: score ?? 3 });
+      if (description) {
+        items.push({
+          category: asCategory(rec.category),
+          description,
+          relatedSubtasks: asStringArray(rec.relatedSubtasks),
+        });
       }
-    } else if (typeof item === "string") {
-      risks.push({ description: item, score: 3 });
     }
+  }
+  return items;
+}
+
+// Normalize risks into ScoredRisk, deriving score/severity from likelihood x
+// impact (or clamping a directly-provided numeric score into the 1-9 range).
+function asScoredRisks(value: unknown): ScoredRisk[] {
+  if (!Array.isArray(value)) return [];
+  const risks: ScoredRisk[] = [];
+  for (const item of value) {
+    let description: string | undefined;
+    let category: CritiqueCategory = "requirements";
+    let likelihood: RiskLevel = "medium";
+    let impact: RiskLevel = "medium";
+    let explanation = "";
+    let relatedSubtasks: string[] = [];
+    let providedScore: number | undefined;
+    if (typeof item === "string") {
+      description = item;
+    } else if (item && typeof item === "object") {
+      const rec = item as Record<string, unknown>;
+      description = typeof rec.description === "string" ? rec.description : undefined;
+      category = asCategory(rec.category);
+      likelihood = asRiskLevel(rec.likelihood);
+      impact = asRiskLevel(rec.impact);
+      explanation = typeof rec.explanation === "string" ? rec.explanation : "";
+      relatedSubtasks = asStringArray(rec.relatedSubtasks);
+      if (typeof rec.score === "number") providedScore = rec.score;
+    }
+    if (description === undefined) continue;
+    const score =
+      providedScore !== undefined
+        ? Math.min(9, Math.max(1, Math.round(providedScore)))
+        : riskScore(likelihood, impact);
+    risks.push({
+      description,
+      category,
+      likelihood,
+      impact,
+      score,
+      severity: severityFromScore(score),
+      explanation,
+      relatedSubtasks,
+    });
   }
   return risks;
 }
 
 /**
  * Coerce a critic session's structured output into an AdversarialReview.
- * Throws when the output does not contain any usable critique, so the caller can
- * fall back to Modo A.
+ * Accepts both the flat and the categorized output shapes and normalizes into
+ * the current rich schema. Throws when the output contains no usable critique,
+ * so the caller can fall back to Modo A.
  */
 export function parseAdversarialReview(output: unknown): AdversarialReview {
   if (!output || typeof output !== "object") {
     throw new Error("Critic session returned no structured output");
   }
   const rec = output as Record<string, unknown>;
-  const review: AdversarialReview = {
-    weakAssumptions: asStringArray(rec.weakAssumptions),
-    missingEdgeCases: asStringArray(rec.missingEdgeCases),
-    risks: asRisks(rec.risks),
-    recommendedChanges: asStringArray(rec.recommendedChanges),
-    confidenceAdjustment:
-      typeof rec.confidenceAdjustment === "string" ? rec.confidenceAdjustment : "",
-  };
+  const weakAssumptions = asCategorizedItems(rec.weakAssumptions);
+  const missingEdgeCases = asCategorizedItems(rec.missingEdgeCases);
+  const risks = asScoredRisks(rec.risks);
+  const recommendedChanges = asStringArray(rec.recommendedChanges);
+  const historicalInsights = asStringArray(rec.historicalInsights);
 
   const hasContent =
-    review.weakAssumptions.length > 0 ||
-    review.missingEdgeCases.length > 0 ||
-    review.risks.length > 0 ||
-    review.recommendedChanges.length > 0;
+    weakAssumptions.length > 0 ||
+    missingEdgeCases.length > 0 ||
+    risks.length > 0 ||
+    recommendedChanges.length > 0;
   if (!hasContent) {
     throw new Error("Critic session structured output contained no critique");
   }
-  return review;
+
+  const overallScore = risks.length
+    ? Math.round((risks.reduce((sum, r) => sum + r.score, 0) / risks.length) * 10) / 10
+    : 0;
+  const highestSeverity = risks.reduce<RiskSeverity>(
+    (max, r) =>
+      SEVERITY_ORDER.indexOf(r.severity) > SEVERITY_ORDER.indexOf(max) ? r.severity : max,
+    "low",
+  );
+
+  return {
+    weakAssumptions,
+    missingEdgeCases,
+    risks,
+    recommendedChanges,
+    historicalInsights,
+    riskSummary: {
+      riskCount: risks.length,
+      overallScore,
+      highestSeverity,
+      scoringModel: SCORING_MODEL,
+    },
+    confidenceAdjustment:
+      typeof rec.confidenceAdjustment === "string" ? rec.confidenceAdjustment : "",
+  };
 }
 
 function sleep(ms: number): Promise<void> {

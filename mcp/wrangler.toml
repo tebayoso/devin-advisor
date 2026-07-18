@@ -9,6 +9,15 @@ routes = [
   { pattern = "devin.sinequix.com", custom_domain = true }
 ]
 
+# Optional shared Bearer-token auth. Leave unset for a public demo deployment.
+# When set, requests to POST /mcp must send `Authorization: Bearer <AUTH_TOKEN>`
+# or receive a 401. Set it as an encrypted secret (recommended), not plaintext:
+#   wrangler secret put AUTH_TOKEN
+# For local dev you can put it in a git-ignored `.dev.vars` file:
+#   AUTH_TOKEN = "your-token"
+# [vars]
+# AUTH_TOKEN = ""
+
 # Cloudflare D1 binding. Create the database with:
 #   wrangler d1 create devin_scope
 # then paste the returned database_id below.
@@ -17,6 +26,16 @@ binding = "DB"
 database_name = "devin_scope"
 database_id = "db225267-1030-4869-9530-b7cfdc4ff586"
 
+# Cloudflare Workers AI binding used by decompose_task for model-backed
+# decomposition. Optional: without it the tool uses a deterministic heuristic.
+# Override the default model (@cf/meta/llama-3-8b-instruct) via the
+# DECOMPOSE_MODEL var below if desired.
+[ai]
+binding = "AI"
+
+# [vars]
+# DECOMPOSE_MODEL = "@cf/meta/llama-3-8b-instruct"
+
 # Optional "Modo B": delegate the adversarial review to a separate critic Devin
 # session via the Devin REST API. Configure the API key as a secret (never commit it):
 #   wrangler secret put DEVIN_API_KEY
@@ -24,3 +43,10 @@ database_id = "db225267-1030-4869-9530-b7cfdc4ff586"
 # Optionally override the API base URL (defaults to https://api.devin.ai/v1):
 # [vars]
 # DEVIN_API_BASE_URL = "https://api.devin.ai/v1"
+
+# Linear / Jira ticket integration (optional; required only for scope_ticket /
+# post_plan_to_ticket). Set these as encrypted secrets, never commit values:
+#   wrangler secret put LINEAR_API_KEY
+#   wrangler secret put JIRA_BASE_URL   # e.g. https://your-site.atlassian.net
+#   wrangler secret put JIRA_EMAIL
+#   wrangler secret put JIRA_API_TOKEN

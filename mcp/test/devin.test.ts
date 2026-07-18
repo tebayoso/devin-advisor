@@ -6,9 +6,9 @@ import {
   devinApiConfigured,
   parseAdversarialReview,
   runCriticSession,
-} from "./devin.js";
-import { callTool } from "./tools.js";
-import type { Env, Plan } from "./types.js";
+} from "../src/devin.ts";
+import { callTool } from "../src/tools.ts";
+import type { Env, Plan } from "../src/types.ts";
 
 const plan: Plan = {
   id: "plan-1",
@@ -35,21 +35,32 @@ const plan: Plan = {
 
 const noopDb = {} as Env["DB"];
 
-// Minimal D1 stub whose getPlan query returns the fixture plan row.
+// D1 stub: getPlan (FROM plans) returns the fixture row; queryMemory (FROM
+// memory) returns no history; inserts are no-ops. Enough to exercise the full
+// run_adversarial_review path (getPlan -> relevantMemory -> insertReview).
 const fakeDb = {
-  prepare() {
+  prepare(sql: string) {
     return {
       bind() {
         return {
           first() {
-            return Promise.resolve({
-              id: plan.id,
-              workspace: plan.workspace,
-              original_task: plan.originalTask,
-              decomposition: JSON.stringify(plan.decomposition),
-              confidence_summary: plan.confidenceSummary,
-              created_at: plan.createdAt,
-            });
+            if (sql.includes("FROM plans")) {
+              return Promise.resolve({
+                id: plan.id,
+                workspace: plan.workspace,
+                original_task: plan.originalTask,
+                decomposition: JSON.stringify(plan.decomposition),
+                confidence_summary: plan.confidenceSummary,
+                created_at: plan.createdAt,
+              });
+            }
+            return Promise.resolve(null);
+          },
+          all() {
+            return Promise.resolve({ results: [] });
+          },
+          run() {
+            return Promise.resolve({});
           },
         };
       },
@@ -70,18 +81,21 @@ test("buildCriticPrompt includes the task, decomposition, and structured-output 
   assert.match(prompt, /provide_structured_output/);
 });
 
-test("parseAdversarialReview coerces partial output and rejects empty output", () => {
+test("parseAdversarialReview normalizes to the rich schema and rejects empty output", () => {
   const review = parseAdversarialReview({
     weakAssumptions: ["a", 1],
     risks: [{ description: "r" }, "plain"],
     recommendedChanges: ["c"],
   });
-  assert.deepEqual(review.weakAssumptions, ["a"]);
-  assert.deepEqual(review.risks, [
-    { description: "r", score: 3 },
-    { description: "plain", score: 3 },
+  assert.deepEqual(review.weakAssumptions, [
+    { category: "requirements", description: "a", relatedSubtasks: [] },
   ]);
+  assert.equal(review.risks.length, 2);
+  assert.equal(review.risks[0].description, "r");
+  assert.equal(review.risks[0].score, 4); // medium x medium
+  assert.equal(review.risks[0].severity, "medium");
   assert.equal(review.missingEdgeCases.length, 0);
+  assert.equal(review.riskSummary.riskCount, 2);
 
   assert.throws(() => parseAdversarialReview(null));
   assert.throws(() =>
@@ -129,7 +143,10 @@ test("runCriticSession creates a session, polls, and returns a critic-session re
     });
     assert.equal(review.mode, "critic-session");
     assert.equal(review.criticSessionUrl, "https://app.devin.ai/sessions/sess-1");
-    assert.deepEqual(review.weakAssumptions, ["assumes single region"]);
+    assert.deepEqual(review.weakAssumptions, [
+      { category: "requirements", description: "assumes single region", relatedSubtasks: [] },
+    ]);
+    assert.equal(review.risks[0].score, 4);
     assert.ok(polls >= 2);
   } finally {
     globalThis.fetch = original;
@@ -192,7 +209,7 @@ test("run_adversarial_review falls back to Modo A when the critic session fails"
 });
 
 test("run_adversarial_review uses Modo A when no API key is configured", async () => {
-  const env: Env = { DB: noopDb };
+  const env: Env = { DB: fakeDb };
   const result = (await callTool(env, "run_adversarial_review", { plan_id: "plan-1" })) as {
     mode: string;
     fallbackReason?: string;

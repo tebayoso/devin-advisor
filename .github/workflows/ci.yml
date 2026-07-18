@@ -20,3 +20,7 @@ jobs:
         run: npm install
       - name: Typecheck
         run: npm run typecheck
+      - name: Test (unit)
+        run: npm test
+      - name: Test (integration, workers runtime)
+        run: npm run test:integration
