@@ -41,6 +41,10 @@ User ──▶ Devin Cloud Agent
 - **Adversarial review, Modo A (MVP)** — the tool returns a strong structured prompt and the same Devin
   agent performs the critique. Spawning a separate critic Devin session (Modo B) is deferred.
 - **Structured JSON** — tools return clean JSON so the agent can reason over results reliably.
+- **Workspace isolation** — every tenant-scoped table (`plans`, `reviews`, `memory`) carries a NOT NULL
+  `workspace` column and each tool normalizes a missing workspace to a canonical `default` bucket. All
+  reads (`get_plan`, `query_memory`, `run_adversarial_review`) filter by workspace, so data is isolated
+  per workspace and cross-workspace reads are prevented. Backfill: `migrations/0001_workspace_isolation.sql`.
 
 ## Scaffold status
 
