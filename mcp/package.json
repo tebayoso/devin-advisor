@@ -11,15 +11,19 @@
     "lint": "tsc --noEmit",
     "pretest": "tsc -p tsconfig.build.json",
     "test": "node --import tsx --test test/*.test.ts test/*.test.mjs",
+    "test:integration": "vitest run",
+    "test:integration:watch": "vitest",
     "dev": "wrangler dev",
     "deploy": "wrangler deploy",
     "db:init": "wrangler d1 execute devin_scope --file=./schema.sql",
     "db:migrate": "wrangler d1 execute devin_scope --file=./migrations/0001_workspace_isolation.sql"
   },
   "devDependencies": {
+    "@cloudflare/vitest-pool-workers": "0.4.31",
     "@cloudflare/workers-types": "4.20240725.0",
     "tsx": "4.19.2",
     "typescript": "5.5.4",
+    "vitest": "1.5.3",
     "wrangler": "3.65.1"
   }
 }
