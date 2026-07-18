@@ -119,6 +119,31 @@ function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
+/**
+ * Best-effort request to stop an abandoned critic session so it stops consuming
+ * compute credits once we've given up waiting for it. Failures are swallowed so
+ * they never mask the original fallback reason.
+ */
+async function stopCriticSession(
+  url: string,
+  headers: Record<string, string>,
+  sessionId: string,
+): Promise<void> {
+  try {
+    await fetch(`${url}/session/${sessionId}/message`, {
+      method: "POST",
+      headers,
+      body: JSON.stringify({
+        message:
+          "The devin-scope adversarial review was abandoned (timeout or unusable output). " +
+          "Stop working and end the session now to avoid consuming further credits.",
+      }),
+    });
+  } catch {
+    // Best-effort cleanup only; ignore any failure.
+  }
+}
+
 interface CreateSessionResponse {
   session_id: string;
   url?: string;
@@ -169,26 +194,36 @@ export async function runCriticSession(
     throw new Error("Critic session creation returned no session_id");
   }
 
-  const deadline = now() + maxPollMs;
-  let detail: SessionDetail | null = null;
-  while (now() < deadline) {
-    await sleep(pollIntervalMs);
-    const res = await fetch(`${url}/session/${created.session_id}`, { headers });
-    if (!res.ok) {
-      throw new Error(`Failed to poll critic session: HTTP ${res.status}`);
+  let succeeded = false;
+  try {
+    const deadline = now() + maxPollMs;
+    let detail: SessionDetail | null = null;
+    while (now() < deadline) {
+      await sleep(pollIntervalMs);
+      const res = await fetch(`${url}/session/${created.session_id}`, { headers });
+      if (!res.ok) {
+        throw new Error(`Failed to poll critic session: HTTP ${res.status}`);
+      }
+      detail = (await res.json()) as SessionDetail;
+      const status = detail.status_enum?.toLowerCase();
+      if (detail.structured_output || (status && TERMINAL_STATUSES.has(status))) {
+        break;
+      }
     }
-    detail = (await res.json()) as SessionDetail;
-    const status = detail.status_enum?.toLowerCase();
-    if (detail.structured_output || (status && TERMINAL_STATUSES.has(status))) {
-      break;
-    }
-  }
 
-  if (!detail) {
-    throw new Error("Critic session did not return a result before timeout");
+    if (!detail) {
+      throw new Error("Critic session did not return a result before timeout");
+    }
+    const review = parseAdversarialReview(detail.structured_output);
+    review.mode = "critic-session";
+    if (created.url) review.criticSessionUrl = created.url;
+    succeeded = true;
+    return review;
+  } finally {
+    // Abandoned (timeout, poll error, or unusable output): best-effort stop so
+    // the session doesn't keep running and consuming credits.
+    if (!succeeded) {
+      await stopCriticSession(url, headers, created.session_id);
+    }
   }
-  const review = parseAdversarialReview(detail.structured_output);
-  review.mode = "critic-session";
-  if (created.url) review.criticSessionUrl = created.url;
-  return review;
 }
