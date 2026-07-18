@@ -12,12 +12,19 @@ import { SCOPE_INSTRUCTIONS } from "./instructions.js";
 import { DEFAULT_PROMOTION_THRESHOLD, promotePlan } from "./promotion.js";
 import { buildAdversarialReview, extractKeywords } from "./review.js";
 import { suggestRouting } from "./routing.js";
+import {
+  createTicketClient,
+  formatPlanComment,
+  parseTicketRef,
+  ticketToTask,
+} from "./tickets.js";
 import type {
   AdversarialReview,
   Decomposition,
   Env,
   MemoryEntry,
   PromotionTarget,
+  TicketProvider,
   ToolDefinition,
 } from "./types.js";
 
@@ -120,6 +127,49 @@ export const TOOL_DEFINITIONS: ToolDefinition[] = [
     },
   },
   {
+    name: "scope_ticket",
+    description:
+      "Ingest a Linear/Jira ticket (id or URL), fetch its content, and decompose it into a scoping plan.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        ticket: { type: "string", description: "Ticket id (e.g. ENG-123) or full URL." },
+        provider: {
+          type: "string",
+          enum: ["linear", "jira"],
+          description: "Required when passing a bare id; inferred from URLs.",
+        },
+        context: { type: "string", description: "Optional extra context (repo, constraints)." },
+        workspace: { type: "string", description: "Optional workspace id for memory scoping." },
+      },
+      required: ["ticket"],
+      additionalProperties: false,
+    },
+  },
+  {
+    name: "post_plan_to_ticket",
+    description:
+      "Post a previously saved plan back to its Linear/Jira ticket as a comment.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        ticket: { type: "string", description: "Ticket id (e.g. ENG-123) or full URL." },
+        provider: {
+          type: "string",
+          enum: ["linear", "jira"],
+          description: "Required when passing a bare id; inferred from URLs.",
+        },
+        plan_id: { type: "string", description: "Id returned by save_plan." },
+        workspace: {
+          type: "string",
+          description: "Workspace the plan belongs to. Must match the plan's workspace.",
+        },
+      },
+      required: ["ticket", "plan_id"],
+      additionalProperties: false,
+    },
+  },
+  {
     name: "get_verification_checklist",
     description: "Return a concrete self-verification checklist to satisfy before proposing a PR.",
     inputSchema: { type: "object", properties: {}, additionalProperties: false },
@@ -166,6 +216,13 @@ function str(args: Record<string, unknown>, key: string): string | undefined {
   return typeof v === "string" ? v : undefined;
 }
 
+function providerHint(args: Record<string, unknown>): TicketProvider | undefined {
+  const v = args.provider;
+  return v === "linear" || v === "jira" ? v : undefined;
+}
+
+type FetchLike = typeof fetch;
+
 // Pull memory entries relevant to a task by querying the top keywords and
 // merging unique results (query_memory matches substrings, so per-keyword
 // queries retrieve far more useful history than the raw task string).
@@ -190,6 +247,7 @@ export async function callTool(
   env: Env,
   name: string,
   args: Record<string, unknown>,
+  fetchImpl: FetchLike = fetch,
 ): Promise<unknown> {
   switch (name) {
     case "get_scope_instructions":
@@ -257,6 +315,31 @@ export async function callTool(
         confidenceSummary: decomposition.confidenceSummary ?? null,
       });
       return { plan_id: plan.id };
+    }
+
+    case "scope_ticket": {
+      const ticketInput = str(args, "ticket");
+      if (!ticketInput) throw new Error("`ticket` is required");
+      const ref = parseTicketRef(ticketInput, providerHint(args));
+      const client = createTicketClient(ref.provider, env, fetchImpl);
+      const ticket = await client.fetchTicket(ref.id);
+      const context = str(args, "context");
+      const task = ticketToTask(ticket);
+      return { ticket, task, decomposition: await decomposeTask(env, task, context) };
+    }
+
+    case "post_plan_to_ticket": {
+      const ticketInput = str(args, "ticket");
+      const planId = str(args, "plan_id");
+      if (!ticketInput || !planId) {
+        throw new Error("`ticket` and `plan_id` are required");
+      }
+      const plan = await getPlan(env, planId, normalizeWorkspace(str(args, "workspace")));
+      if (!plan) throw new Error(`Plan not found: ${planId}`);
+      const ref = parseTicketRef(ticketInput, providerHint(args));
+      const client = createTicketClient(ref.provider, env, fetchImpl);
+      const { url } = await client.postComment(ref.id, formatPlanComment(plan));
+      return { posted: true, provider: ref.provider, ticket_id: ref.id, comment_url: url ?? null };
     }
 
     case "get_plan": {

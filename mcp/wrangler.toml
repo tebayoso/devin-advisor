@@ -43,3 +43,10 @@ binding = "AI"
 # Optionally override the API base URL (defaults to https://api.devin.ai/v1):
 # [vars]
 # DEVIN_API_BASE_URL = "https://api.devin.ai/v1"
+
+# Linear / Jira ticket integration (optional; required only for scope_ticket /
+# post_plan_to_ticket). Set these as encrypted secrets, never commit values:
+#   wrangler secret put LINEAR_API_KEY
+#   wrangler secret put JIRA_BASE_URL   # e.g. https://your-site.atlassian.net
+#   wrangler secret put JIRA_EMAIL
+#   wrangler secret put JIRA_API_TOKEN

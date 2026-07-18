@@ -34,6 +34,8 @@ Full design: [`docs/architecture.md`](docs/architecture.md).
 | `run_adversarial_review` | Structured critique: weak assumptions, missing edge cases, risks |
 | `save_plan` / `get_plan` | Persist and retrieve plans |
 | `save_memory` / `query_memory` | Cross-session key/value memory scoped by workspace |
+| `scope_ticket` | Ingest a Linear/Jira ticket (id or URL) and decompose it into a plan |
+| `post_plan_to_ticket` | Post a saved plan back to its Linear/Jira ticket as a comment |
 | `get_verification_checklist` | Self-verification checklist to satisfy before proposing a PR |
 | `promote_plan` | Score a plan against quality heuristics and, if it qualifies, emit a Knowledge/Playbook artifact + the Devin MCP calls to persist it |
 
@@ -42,6 +44,14 @@ Full design: [`docs/architecture.md`](docs/architecture.md).
 Once a plan has been decomposed, adversarially reviewed, and incorporated, call `promote_plan` to
 auto-promote it into **Devin Knowledge** or a new **Playbook** for reuse. See
 [`docs/promotion.md`](docs/promotion.md) for the heuristics and the full flow.
+
+### Linear / Jira integration
+
+`scope_ticket` and `post_plan_to_ticket` read ticket content from Linear or Jira
+and can write the final plan back as a comment. Configure credentials as Worker
+secrets (never commit them): `LINEAR_API_KEY` for Linear, and
+`JIRA_BASE_URL` / `JIRA_EMAIL` / `JIRA_API_TOKEN` for Jira. The provider is
+inferred from a ticket URL, or pass `provider: "linear" | "jira"` with a bare id.
 
 ## Quick start (4 steps)
 
