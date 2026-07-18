@@ -143,6 +143,24 @@ test("coerceDecomposition validates and repairs model output", () => {
   assert.equal(d.subtasks[0].dependsOn.length, 0); // dangling "ghost" dropped
 });
 
+test("padding preserves model subtasks' relative dependencies (no id collision)", () => {
+  // Two valid model subtasks (s2 depends on s1) get padded with filler that
+  // would otherwise reuse ids s1.. and corrupt the dependency remap.
+  const raw = {
+    subtasks: [
+      { id: "s1", title: "First model step", description: "d", confidence: "high", justification: "j", dependsOn: [] },
+      { id: "s2", title: "Second model step", description: "d", confidence: "high", justification: "j", dependsOn: ["s1"] },
+    ],
+  };
+  const d = coerceDecomposition(raw, "Make the app faster.");
+  assertValidDecomposition(d);
+  const first = d.subtasks.find((s) => s.title === "First model step");
+  const second = d.subtasks.find((s) => s.title === "Second model step");
+  assert.ok(first && second);
+  // The second step must still depend on the first step, not a padding step.
+  assert.deepEqual(second.dependsOn, [first.id]);
+});
+
 test("decomposeTask falls back to heuristic when no AI binding is configured", async () => {
   const d = await decomposeTask({ DB: undefined }, "Add offline support to the mobile app.");
   assertValidDecomposition(d);

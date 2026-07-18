@@ -187,10 +187,14 @@ export function coerceDecomposition(
   // Enforce the 3-7 contract: pad from the heuristic, or trim the tail.
   if (subtasks.length < MIN_SUBTASKS) {
     const filler = heuristicSubtasks(task, context);
+    let pad = 0;
     for (const extra of filler) {
       if (subtasks.length >= MIN_SUBTASKS) break;
       if (!subtasks.some((s) => s.title.toLowerCase() === extra.title.toLowerCase())) {
-        subtasks.push(extra);
+        // Use a disjoint id namespace so filler ids never collide with the
+        // model's s1..sN ids (which would corrupt dependsOn remapping in
+        // renumber). Filler steps don't chain onto arbitrary model output.
+        subtasks.push({ ...extra, id: `f${++pad}`, dependsOn: [] });
       }
     }
   }
