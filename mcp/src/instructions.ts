@@ -23,6 +23,9 @@ Call \`run_adversarial_review\` for the saved plan. Actively look for:
 - Concrete recommended changes to the plan
 - An overall confidence adjustment
 Do NOT skip this step. A plan without an adversarial review is incomplete.
+When a Devin API key is configured on the server (Modo B), this runs in a separate, short critic Devin
+session; otherwise it falls back to an in-agent review (Modo A). The response's \`mode\` field says which
+was used.
 
 ## Step 4 — Incorporate critiques
 Revise the decomposition to address the adversarial findings. Lower confidence where the review exposed

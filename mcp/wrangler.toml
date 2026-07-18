@@ -16,3 +16,11 @@ routes = [
 binding = "DB"
 database_name = "devin_scope"
 database_id = "db225267-1030-4869-9530-b7cfdc4ff586"
+
+# Optional "Modo B": delegate the adversarial review to a separate critic Devin
+# session via the Devin REST API. Configure the API key as a secret (never commit it):
+#   wrangler secret put DEVIN_API_KEY
+# When unset, run_adversarial_review falls back to "Modo A" (in-agent review).
+# Optionally override the API base URL (defaults to https://api.devin.ai/v1):
+# [vars]
+# DEVIN_API_BASE_URL = "https://api.devin.ai/v1"
