@@ -1,4 +1,5 @@
 import { getPlan, insertPlan, queryMemory, saveMemory } from "./db.js";
+import { decomposeTask } from "./decompose.js";
 import { SCOPE_INSTRUCTIONS } from "./instructions.js";
 import type {
   AdversarialReview,
@@ -107,26 +108,8 @@ function str(args: Record<string, unknown>, key: string): string | undefined {
   return typeof v === "string" ? v : undefined;
 }
 
-// NOTE (scaffold): decompose_task and run_adversarial_review currently return a
-// deterministic skeleton. Full model-backed generation is tracked in the roadmap issues.
-function skeletonDecomposition(task: string): Decomposition {
-  return {
-    subtasks: [
-      {
-        id: "s1",
-        title: `Clarify requirements for: ${task}`,
-        description: "Resolve ambiguities and define acceptance criteria before implementation.",
-        confidence: "high",
-        justification: "Scoping is well-understood and low-risk.",
-        dependsOn: [],
-      },
-    ],
-    executionStrategy: "sequential",
-    estimatedComplexity: "medium",
-    confidenceSummary: "Skeleton decomposition; refine with model-backed generation.",
-  };
-}
-
+// NOTE (scaffold): run_adversarial_review currently returns a deterministic
+// skeleton. Full model-backed generation is tracked in the roadmap issues.
 function skeletonReview(): AdversarialReview {
   return {
     weakAssumptions: ["The task description is complete."],
@@ -149,7 +132,7 @@ export async function callTool(
     case "decompose_task": {
       const task = str(args, "task");
       if (!task) throw new Error("`task` is required");
-      return skeletonDecomposition(task);
+      return decomposeTask(env, task, str(args, "context"));
     }
 
     case "run_adversarial_review": {

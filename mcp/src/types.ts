@@ -1,5 +1,10 @@
 export interface Env {
   DB: D1Database;
+  // Optional Cloudflare Workers AI binding for model-backed task decomposition.
+  // When absent, decompose_task falls back to a deterministic heuristic.
+  AI?: Ai;
+  // Optional override for the Workers AI text-generation model id.
+  DECOMPOSE_MODEL?: string;
 }
 
 export type Confidence = "high" | "medium" | "low";

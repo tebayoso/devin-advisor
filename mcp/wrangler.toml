@@ -16,3 +16,13 @@ routes = [
 binding = "DB"
 database_name = "devin_scope"
 database_id = "db225267-1030-4869-9530-b7cfdc4ff586"
+
+# Cloudflare Workers AI binding used by decompose_task for model-backed
+# decomposition. Optional: without it the tool uses a deterministic heuristic.
+# Override the default model (@cf/meta/llama-3-8b-instruct) via the
+# DECOMPOSE_MODEL var below if desired.
+[ai]
+binding = "AI"
+
+# [vars]
+# DECOMPOSE_MODEL = "@cf/meta/llama-3-8b-instruct"
